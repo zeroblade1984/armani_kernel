@@ -13,9 +13,6 @@
  */
 
 #include <linux/delay.h>
-#ifdef CONFIG_HAS_EARLYSUSPEND
-#include <linux/earlysuspend.h>
-#endif
 #include <linux/firmware.h>
 #include <linux/gpio.h>
 #include <linux/init.h>
@@ -32,6 +29,12 @@
 #include <linux/power_supply.h>
 #include <linux/input/mt.h>
 #include "ft5x06_ts.h"
+#if defined(CONFIG_FB)
+#include <linux/notifier.h>
+#include <linux/fb.h>
+#elif defined(CONFIG_HAS_EARLYSUSPEND)
+#include <linux/earlysuspend.h>
+#endif
 
 //register address
 #define FT5X0X_REG_DEVIDE_MODE	0x00
@@ -165,9 +168,6 @@ struct ft5x06_data {
 	struct regulator *vdd;
 	struct regulator *vcc_i2c;
 	const struct ft5x06_bus_ops *bops;
-#ifdef CONFIG_HAS_EARLYSUSPEND
-	struct early_suspend early_suspend;
-#endif
 	struct ft5x06_tracker tracker[FT5X0X_MAX_FINGER];
 	int  irq;
 	bool dbgdump;
@@ -176,6 +176,11 @@ struct ft5x06_data {
 	struct delayed_work noise_filter_delayed_work;
 	u8 chip_id;
 	u8 is_usb_plug_in;
+#if defined(CONFIG_FB)
+	struct notifier_block fb_notif;
+#elif defined(CONFIG_HAS_EARLYSUSPEND)
+	struct early_suspend early_suspend;
+#endif
 };
 
 static int ft5x06_recv_byte(struct ft5x06_data *ft5x06, u8 len, ...)
@@ -953,7 +958,31 @@ int ft5x06_resume(struct ft5x06_data *ft5x06)
 }
 EXPORT_SYMBOL_GPL(ft5x06_resume);
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
+#if defined(CONFIG_FB)
+static int fb_notifier_callback(struct notifier_block *self,
+				 unsigned long event, void *data)
+{
+	struct fb_event *evdata = data;
+	int *blank;
+	struct ft5x06_data *ft5x06 =
+		container_of(self, struct ft5x06_data, fb_notif);
+		
+	if (evdata && evdata->data && event == FB_EVENT_BLANK &&
+			ft5x06 && ft5x06->dev) {		
+		blank = evdata->data;
+		if (*blank == FB_BLANK_UNBLANK) {
+			pr_info("ft5x06 resume!\n");
+			ft5x06_resume(ft5x06);
+		}
+		else if (*blank == FB_BLANK_POWERDOWN) {
+			pr_info("ft5x06 suspend!\n");
+			ft5x06_suspend(ft5x06);
+		}
+	}
+
+	return 0;
+}
+#elif defined(CONFIG_HAS_EARLYSUSPEND)
 static void ft5x06_early_suspend(struct early_suspend *h)
 {
 	struct ft5x06_data *ft5x06 = container_of(h,
@@ -966,26 +995,6 @@ static void ft5x06_early_resume(struct early_suspend *h)
 	struct ft5x06_data *ft5x06 = container_of(h,
 					struct ft5x06_data, early_suspend);
 	ft5x06_resume(ft5x06);
-}
-#else
-static int ft5x06_input_disable(struct input_dev *in_dev)
-{
-	struct ft5x06_data *ft5x06 = input_get_drvdata(in_dev);
-
-	pr_info("ft5x06 disable!\n");
-	ft5x06_suspend(ft5x06);
-
-	return 0;
-}
-
-static int ft5x06_input_enable(struct input_dev *in_dev)
-{
-	struct ft5x06_data *ft5x06 = input_get_drvdata(in_dev);
-
-	pr_info("ft5x06 enable!\n");
-	ft5x06_resume(ft5x06);
-
-	return 0;
 }
 #endif
 
@@ -2072,8 +2081,6 @@ struct ft5x06_data *ft5x06_probe(struct device *dev,
 		goto err_free_input;
 	}
 
-	ft5x06->input->enable = ft5x06_input_enable;
-	ft5x06->input->disable = ft5x06_input_disable;
 	ft5x06->input->enabled = true;
 	/* register input device */
 	error = input_register_device(ft5x06->input);
@@ -2123,7 +2130,15 @@ struct ft5x06_data *ft5x06_probe(struct device *dev,
 		goto err_put_vkeys;
 	}
 
-#ifdef CONFIG_HAS_EARLYSUSPEND
+#if defined(CONFIG_FB)
+	ft5x06->fb_notif.notifier_call = fb_notifier_callback;
+
+	 error = fb_register_client(&ft5x06->fb_notif);
+
+	 if (error)
+		 dev_err(dev, "Unable to register fb_notifier: %d\n",
+			 error);
+#elif defined(CONFIG_HAS_EARLYSUSPEND)
 	ft5x06->early_suspend.level   = EARLY_SUSPEND_LEVEL_BLANK_SCREEN+1;
 	ft5x06->early_suspend.suspend = ft5x06_early_suspend;
 	ft5x06->early_suspend.resume  = ft5x06_early_resume;
