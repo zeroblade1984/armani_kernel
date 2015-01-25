@@ -245,7 +245,7 @@ void __init msm8226_add_drivers(void)
 #ifdef CONFIG_ANDROID_RAM_CONSOLE
 	ram_console_debug_init();
 #endif
-#if defined(CONFIG_LCD_KCAL)
+#ifdef CONFIG_LCD_KCAL
 	add_lcd_kcal_devices();
 #endif
 }
