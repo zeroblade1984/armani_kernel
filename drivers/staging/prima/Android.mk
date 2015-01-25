@@ -1,5 +1,8 @@
 # Android makefile for the WLAN Module
 
+# under-optimize WLAN driver
+ccflags-y := -Os
+
 # Build/Package options for 8960 target
 ifeq ($(call is-board-platform,msm8960),true)
 WLAN_CHIPSET := prima
