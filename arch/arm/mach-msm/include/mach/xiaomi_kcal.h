@@ -13,8 +13,8 @@
  * GNU General Public License for more details.
  */
 
-#ifndef __HTC_LCD_KCAL_H
-#define __HTC_LCD_KCAL_H
+#ifndef __XIAOMI_LCD_KCAL_H
+#define __XIAOMI_LCD_KCAL_H
 
 struct kcal_data {
 	int red;
