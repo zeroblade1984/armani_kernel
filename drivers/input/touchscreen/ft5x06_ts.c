@@ -970,17 +970,22 @@ static int fb_notifier_callback(struct notifier_block *self,
 	if (evdata && evdata->data && event == FB_EVENT_BLANK &&
 			ft5x06 && ft5x06->dev) {		
 		blank = evdata->data;
-		if (*blank == FB_BLANK_UNBLANK) {
-			pr_info("ft5x06 resume!\n");
-			ft5x06_resume(ft5x06);
-		}
-		else if (*blank == FB_BLANK_POWERDOWN) {
-			pr_info("ft5x06 suspend!\n");
-			ft5x06_suspend(ft5x06);
+		switch (*blank) {
+			case FB_BLANK_UNBLANK:
+				pr_info("ft5x06 resume!\n");
+				ft5x06_resume(ft5x06);
+				break;
+			case FB_BLANK_POWERDOWN:
+			case FB_BLANK_HSYNC_SUSPEND:
+			case FB_BLANK_VSYNC_SUSPEND:
+			case FB_BLANK_NORMAL:
+				pr_info("ft5x06 suspend!\n");
+				ft5x06_suspend(ft5x06);
+				break;
 		}
 	}
 
-	return 0;
+	return NOTIFY_OK;
 }
 #elif defined(CONFIG_HAS_EARLYSUSPEND)
 static void ft5x06_early_suspend(struct early_suspend *h)
@@ -2132,11 +2137,9 @@ struct ft5x06_data *ft5x06_probe(struct device *dev,
 
 #if defined(CONFIG_FB)
 	ft5x06->fb_notif.notifier_call = fb_notifier_callback;
-
-	 error = fb_register_client(&ft5x06->fb_notif);
-
-	 if (error)
-		 dev_err(dev, "Unable to register fb_notifier: %d\n",
+	error = fb_register_client(&ft5x06->fb_notif);
+	if (error)
+		dev_err(dev, "Unable to register fb_notifier: %d\n",
 			 error);
 #elif defined(CONFIG_HAS_EARLYSUSPEND)
 	ft5x06->early_suspend.level   = EARLY_SUSPEND_LEVEL_BLANK_SCREEN+1;
