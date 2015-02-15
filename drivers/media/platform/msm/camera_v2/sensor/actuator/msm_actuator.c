@@ -628,7 +628,7 @@ static int32_t msm_actuator_get_subdev_id(struct msm_actuator_ctrl_t *a_ctrl,
 		*subdev_id = a_ctrl->pdev->id;
 	else
 		*subdev_id = a_ctrl->subdev_id;
-
+		
 	if (2 == main_cam_eeprom_index) {
 		*subdev_id = 4;
 		a_ctrl->cam_name = 4;

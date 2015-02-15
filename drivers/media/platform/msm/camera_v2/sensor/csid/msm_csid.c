@@ -13,7 +13,6 @@
 #include <linux/delay.h>
 #include <linux/module.h>
 #include <linux/of.h>
-#include <linux/ratelimit.h>
 #include <linux/irqreturn.h>
 #include "msm_csid.h"
 #include "msm_csid_hwreg.h"
@@ -95,7 +94,7 @@ static void msm_csid_set_debug_reg(void __iomem *csidbase,
 static void msm_csid_reset(struct csid_device *csid_dev)
 {
 	msm_camera_io_w(CSID_RST_STB_ALL, csid_dev->base + CSID_RST_CMD_ADDR);
-	wait_for_completion_interruptible(&csid_dev->reset_complete);
+	wait_for_completion(&csid_dev->reset_complete);
 	return;
 }
 
@@ -489,7 +488,7 @@ static long msm_csid_cmd(struct csid_device *csid_dev, void *arg)
 		rc = msm_csid_release(csid_dev);
 		break;
 	default:
-		pr_err_ratelimited("%s: %d failed\n", __func__, __LINE__);
+		pr_err("%s: %d failed\n", __func__, __LINE__);
 		rc = -ENOIOCTLCMD;
 		break;
 	}

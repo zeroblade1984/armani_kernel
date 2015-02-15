@@ -185,6 +185,7 @@ eHalStatus wlan_hdd_remain_on_channel_callback( tHalHandle hHal, void* pCtx,
     }
 
     vos_mem_free( pRemainChanCtx );
+    pRemainChanCtx = NULL;
     complete(&pAdapter->cancel_rem_on_chan_var);
     return eHAL_STATUS_SUCCESS;
 }
@@ -303,7 +304,7 @@ static int wlan_hdd_request_remain_on_channel( struct wiphy *wiphy,
      * wlan driver is keep on receiving the remain on channel command
      * and which is resulting in crash. So not allowing any remain on
      * channel requets when Load/Unload is in progress*/
-    if (WLAN_HDD_IS_LOAD_UNLOAD_IN_PROGRESS(((hdd_context_t *)pAdapter->pHddCtx)))
+    if (((hdd_context_t*)pAdapter->pHddCtx)->isLoadUnloadInProgress)
     {
         hddLog( LOGE,
                 "%s: Wlan Load/Unload is in progress", __func__);
@@ -677,10 +678,9 @@ int wlan_hdd_action( struct wiphy *wiphy, struct net_device *dev,
                 memcpy(&dstMac, &buf[WLAN_HDD_80211_FRM_DA_OFFSET], ETH_ALEN);
                 hddLog(VOS_TRACE_LEVEL_INFO,
                         "%s: Deauth/Disassoc received for STA:"
-                        "%02x:%02x:%02x:%02x:%02x:%02x",
+                        MAC_ADDRESS_STR,
                         __func__,
-                        dstMac[0], dstMac[1], dstMac[2],
-                        dstMac[3], dstMac[4], dstMac[5]);
+                        MAC_ADDR_ARRAY(dstMac));
                 goto err_rem_channel;
             }
         }
@@ -1405,7 +1405,7 @@ void hdd_sendMgmtFrameOverMonitorIface( hdd_adapter_t *pMonAdapter,
          hddLog( LOG1, FL("Success"));
      }
      else
-         hddLog( LOGE, FL("Failed %d"), rxstat);
+         hddLog( LOGE, FL("Failed %d"), rxstat);                   
 
      return ;
 }
@@ -1422,8 +1422,6 @@ void hdd_indicateMgmtFrame( hdd_adapter_t *pAdapter,
     tANI_U8 subType = 0;
     tActionFrmType actionFrmType;
     hdd_cfg80211_state_t *cfgState = NULL;
-    hdd_context_t *pHddCtx = NULL;
-    hdd_scaninfo_t *pScanInfo = NULL;
 
     hddLog(VOS_TRACE_LEVEL_INFO, "%s: Frame Type = %d Frame Length = %d\n",
             __func__, frameType, nFrameLength);
@@ -1480,13 +1478,6 @@ void hdd_indicateMgmtFrame( hdd_adapter_t *pAdapter,
     {
         hddLog( LOGE, FL("pAdapter has invalid magic"));
         return;
-    }
-
-    pHddCtx = WLAN_HDD_GET_CTX(pAdapter);
-    if (NULL == pHddCtx)
-    {
-         hddLog(VOS_TRACE_LEVEL_FATAL,"%s: HDD Context Null Pointer", __func__);
-         return;
     }
 
     if ((WLAN_HDD_SOFTAP == pAdapter->device_mode) ||
@@ -1564,17 +1555,7 @@ void hdd_indicateMgmtFrame( hdd_adapter_t *pAdapter,
                     }
                 }
 #endif
-                if( (actionFrmType == WLAN_HDD_PROV_DIS_REQ) ||
-                    (actionFrmType == WLAN_HDD_GO_NEG_REQ) )
-                {
-                    pScanInfo =  &pHddCtx->scan_info;
-                    if((pScanInfo != NULL) && (pHddCtx->scan_info.mScanPending))
-                    {
-                        hddLog(LOGE,"Action frame received when Scanning is in"
-                                    " progress. Abort Scan.");
-                        hdd_abort_mac_scan(pAdapter->pHddCtx);
-                    }
-                }
+
                 if (((actionFrmType == WLAN_HDD_PROV_DIS_RESP) &&
                             (cfgState->actionFrmState == HDD_PD_REQ_ACK_PENDING)) ||
                         ((actionFrmType == WLAN_HDD_GO_NEG_RESP) &&

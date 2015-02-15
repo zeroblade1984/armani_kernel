@@ -100,20 +100,10 @@
 		};
 	};
 
-	qcom,acpuclk@f9000000 {
-		krait0_mem-supply = <&pma8084_s1_ao>;
-		krait1_mem-supply = <&pma8084_s1_ao>;
-		krait2_mem-supply = <&pma8084_s1_ao>;
-		krait3_mem-supply = <&pma8084_s1_ao>;
-		krait0_dig-supply = <&pma8084_s2_corner_ao>;
-		krait1_dig-supply = <&pma8084_s2_corner_ao>;
-		krait2_dig-supply = <&pma8084_s2_corner_ao>;
-		krait3_dig-supply = <&pma8084_s2_corner_ao>;
-		krait0_hfpll-supply = <&pma8084_l12_ao>;
-		krait1_hfpll-supply = <&pma8084_l12_ao>;
-		krait2_hfpll-supply = <&pma8084_l12_ao>;
-		krait3_hfpll-supply = <&pma8084_l12_ao>;
-		l2_hfpll-supply = <&pma8084_l12_ao>;
+	qcom,clock-krait@f9016000 {
+		l2-dig-supply = <&pma8084_s2_corner_ao>;
+		hfpll-dig-supply = <&pma8084_s2_corner_ao>;
+		hfpll-analog-supply = <&pma8084_l12_ao>;
 	};
 
 	qcom,ssusb@f9200000 {
@@ -162,6 +152,9 @@
 	qcom,msm-thermal {
 		vdd-dig-supply = <&pma8084_s2_floor_corner>;
 		vdd-gfx-supply = <&pma8084_s7_floor_corner>;
+		qti,pmic-opt-curr-temp = <85>;
+		qti,pmic-opt-curr-temp-hysteresis = <10>;
+		qti,pmic-opt-curr-regs = "vdd-dig";
 		/delete-property/ qcom,pmic-sw-mode-temp;
 		/delete-property/ qcom,pmic-sw-mode-temp-hysteresis;
 		/delete-property/ qcom,pmic-sw-mode-regs;
@@ -190,8 +183,16 @@
 	qcom,use-phase-switching;
 };
 
+&mdss_mdp {
+	vdd-cx-supply = <&pma8084_s2_corner>;
+};
+
 &tspp {
 	vdd_cx-supply = <&pma8084_s2_corner>;
+};
+
+&pma8084_s2_corner {
+	qcom,init-smps-mode = <0>;	/* Allow AUTO mode for VDD_CX. */
 };
 
 &krait_regulator_pmic {

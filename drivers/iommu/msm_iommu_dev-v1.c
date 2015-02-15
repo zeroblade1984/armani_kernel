@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -208,10 +208,14 @@ static int msm_iommu_parse_dt(struct platform_device *pdev,
 	ret = of_platform_populate(pdev->dev.of_node,
 				   msm_iommu_v1_ctx_match_table,
 				   NULL, &pdev->dev);
-	if (ret)
+	if (ret) {
 		pr_err("Failed to create iommu context device\n");
+		goto fail;
+	}
 
 	msm_iommu_add_drv(drvdata);
+	return 0;
+
 fail:
 	__put_bus_vote_client(drvdata);
 	return ret;
@@ -295,6 +299,7 @@ static int __devinit msm_iommu_probe(struct platform_device *pdev)
 	if (!drvdata->base)
 		return -ENOMEM;
 
+	drvdata->phys_base = r->start;
 	drvdata->glb_base = drvdata->base;
 
 	if (of_get_property(pdev->dev.of_node, "vdd-supply", NULL)) {

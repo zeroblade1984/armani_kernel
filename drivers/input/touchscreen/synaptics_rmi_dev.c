@@ -85,7 +85,7 @@ static struct device_attribute attrs[] = {
 	__ATTR(length, S_IWUSR | S_IWGRP,
 			NULL,
 			rmidev_sysfs_length_store),
-	__ATTR(data, (S_IRUGO | S_IWUSR | S_IWGRP),
+	__ATTR(data, (S_IWUSR | S_IWGRP),
 			rmidev_sysfs_data_show,
 			rmidev_sysfs_data_store),
 };

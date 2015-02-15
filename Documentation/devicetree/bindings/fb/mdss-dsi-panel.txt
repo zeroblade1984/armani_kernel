@@ -126,6 +126,9 @@ Optional properties:
 						implemented during suspend/resume.
 					"dfps_immediate_clk_mode" = FPS change request is
 						implemented immediately using DSI clocks.
+					"dfps_immediate_porch_mode" = FPS change request is
+						implemented immediately by changing panel porch
+						values.
 - qcom,mdss-dsi-bl-pmic-control-type:	A string that specifies the implementation of backlight
 					control for this panel.
 					"bl_ctrl_pwm" = Backlight controlled by PWM gpio.
@@ -142,6 +145,8 @@ Optional properties:
 					0 = default value.
 - qcom,mdss-dsi-bl-max-level:		Specifies the max backlight level supported by the panel.
 					255 = default value.
+- qcom,mdss-brightness-max-level:	Specifies the max brightness level supported.
+					255 = default value.
 - qcom,mdss-dsi-interleave-mode:	Specifies interleave mode.
 					0 = default value.
 - qcom,mdss-dsi-panel-type:		Specifies the panel operating mode.
@@ -154,15 +159,9 @@ Optional properties:
 					1 = TE through TE gpio pin. (default)
 - qcom,mdss-dsi-te-dcs-command:		Inserts the dcs command.
 					1 = default value.
-- qcom,mdss-dsi-te-v-sync-rd-ptr-irq-line:	Configures the scan line number that the dsi
-					pixel transfer will start on. Rasing this number
-					will result in delaying the start of the pixel
-					transfer.
+- qcom,mdss-dsi-wr-mem-start:		DCS command for write_memory_start.
 					0x2c = default value.
-- qcom,mdss-dsi-te-v-sync-continue-lines:	Represents the difference in number of lines
-					between estimated read pointer and write pointer
-					to allow the updating of all the lines except
-					the first line of the frame.
+- qcom,mdss-dsi-wr-mem-continue:	DCS command for write_memory_continue.
 					0x3c = default value.
 - qcom,mdss-dsi-h-sync-pulse:		Specifies the pulse mode option for the panel.
 					0 = Don't send hsa/he following vs/ve packet(default)
@@ -255,37 +254,9 @@ Optional properties:
 					mode. This master delay (t_init_delay as per DSI spec) should be sum
 					of DSI internal delay to reach fuctional after power up and minimum
 					delay required by panel to reach functional.
-- qcom,mdss-tear-check-disable:		Boolean to disable mdp tear check. Tear check is enabled by default to avoid
-					tearing. Other tear-check properties are ignored if this property is present.
-					The below tear check configuration properties can be individually tuned if
-					tear check is enabled.
-- qcom,mdss-tear-check-sync-cfg-height: Specifies the vertical total number of lines.
-					The default value is 0xfff0.
-- qcom,mdss-tear-check-sync-init-val:	Specifies the init value at which the read pointer gets loaded
-					at vsync edge. The reader pointer refers to the line number of
-					panel buffer that is currently being updated.
-					The default value is panel height.
-- qcom,mdss-tear-check-sync-threshold-start:
-					Allows the first ROI line write to an panel when read pointer is
-					between the range of ROI start line and ROI start line plus this
-					setting.
-					The default value is 4.
-- qcom,mdss-tear-check-sync-threshold-continue:
-					The minimum number of lines the write pointer needs to be
-					above the read pointer so that it is safe to write to the panel.
-					(This check is not done for the first ROI line write of an update)
-					The default value is 4.
-- qcom,mdss-tear-check-start-pos:	Specify the y position from which the start_threshold value is
-					added and write is kicked off if the read pointer falls within that
-					region.
-					The default value is panel height.
-- qcom,mdss-tear-check-rd-ptr-trigger-intr:
-					Specify the read pointer value at which an interrupt has to be
-					generated.
-					The default value is panel height + 1.
-- qcom,mdss-tear-check-frame-rate:	Specify the value to be a real frame rate(fps) x 100 factor to tune the
-					timing of TE simulation with more precision.
-					The default value is 6000 with 60 fps.
+- qcom,mdss-dsi-rx-eot-ignore:		Boolean used to enable ignoring end of transmission packets.
+- qcom,mdss-dsi-tx-eot-append:		Boolean used to enable appending end of transmission packets.
+- qcom,ulps-enabled:			Boolean to enable support for Ultra Low Power State (ULPS) mode.
 
 Note, if a given optional qcom,* binding is not present, then the driver will configure
 the default values specified.
@@ -336,8 +307,8 @@ Example:
 		qcom,mdss-dsi-te-check-enable;
 		qcom,mdss-dsi-te-using-te-pin;
 		qcom,mdss-dsi-te-dcs-command = <1>;
-		qcom,mdss-dsi-te-v-sync-continue-lines = <0x3c>;
-		qcom,mdss-dsi-te-v-sync-rd-ptr-irq-line = <0x2c>;
+		qcom,mdss-dsi-wr-mem-continue = <0x3c>;
+		qcom,mdss-dsi-wr-mem-start = <0x2c>;
 		qcom,mdss-dsi-te-pin-select = <1>;
 		qcom,mdss-dsi-h-sync-pulse = <1>;
 		qcom,mdss-dsi-hfp-power-mode;
@@ -380,12 +351,8 @@ Example:
 		qcom,mdss-dsi-reset-sequence = <1 2>, <0 10>, <1 10>;
 		qcom,mdss-dsi-lp11-init;
 		qcom,mdss-dsi-init-delay-us = <100>;
-		qcom,mdss-tear-check-sync-cfg-height = <0xfff0>;
-		qcom,mdss-tear-check-sync-init-val = <1280>;
-		qcom,mdss-tear-check-sync-threshold-start = <4>;
-		qcom,mdss-tear-check-sync-threshold-continue = <4>;
-		qcom,mdss-tear-check-start-pos = <1280>;
-		qcom,mdss-tear-check-rd-ptr-trigger-intr = <1281>;
-		qcom,mdss-tear-check-frame-rate = <6000>;
+		mdss-dsi-rx-eot-ignore;
+		mdss-dsi-tx-eot-append;
+		qcom,ulps-enabled;
 	};
 };

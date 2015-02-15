@@ -6,7 +6,16 @@
 ** Description:
 **     TouchSense Kernel Module main entry-point.
 **
-** Copyright (C) 2014 XiaoMi, Inc.
+** Portions Copyright (C) 2015 XiaoMi, Inc. All Rights Reserved.
+** Portions Copyright (c) 2008-2012 Immersion Corporation. All Rights Reserved.
+**
+** This file contains Original Code and/or Modifications of Original Code
+** as defined in and that are subject to the GNU Public License v2 -
+** (the 'License'). You may not use this file except in compliance with the
+** License. You should have received a copy of the GNU General Public License
+** along with this program; if not, write to the Free Software Foundation, Inc.,
+** 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA or contact
+** TouchSenseSales@immersion.com.
 **
 ** The Original Code and all software distributed under the License are
 ** distributed on an 'AS IS' basis, WITHOUT WARRANTY OF ANY KIND, EITHER
@@ -31,7 +40,7 @@
 #include <linux/platform_device.h>
 #include <asm/uaccess.h>
 #include <asm/atomic.h>
-#include "tspdrv.h"
+#include <tspdrv.h>
 
 static int g_nTimerPeriodMs = 5; /* 5ms timer by default. This variable could be used by the SPI.*/
 
@@ -40,7 +49,7 @@ static int g_nTimerPeriodMs = 5; /* 5ms timer by default. This variable could be
 static atomic_t g_bRuntimeRecord;
 #endif
 
-#include "ImmVibeSPI.c"
+#include <ImmVibeSPI.c>
 #if (defined(VIBE_DEBUG) && defined(VIBE_RECORD)) || defined(VIBE_RUNTIME_RECORD)
 #include <tspdrvRecorder.c>
 #endif
@@ -81,9 +90,9 @@ static int g_nMajor = 0;
 
 
 /* Needs to be included after the global variables because they use them */
-#include "tspdrvOutputDataHandler.c"
+#include <tspdrvOutputDataHandler.c>
 #ifdef CONFIG_HIGH_RES_TIMERS
-    #include "VibeOSKernelLinuxHRTime.c"
+    #include <VibeOSKernelLinuxHRTime.c>
 #else
     #include <VibeOSKernelLinuxTime.c>
 #endif

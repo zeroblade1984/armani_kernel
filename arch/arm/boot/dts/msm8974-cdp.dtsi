@@ -787,3 +787,4 @@
 &dsi_dual_jdi_cmd_1 {
 	qcom,cont-splash-enabled;
 };
+

@@ -406,6 +406,15 @@ typedef enum
   /* Periodic Tx Pattern FW Indication */
   WDI_PERIODIC_TX_PTRN_FW_IND,
 
+#ifdef FEATURE_WLAN_BATCH_SCAN
+  /*Batch scan result indication from FW*/
+  WDI_BATCH_SCAN_RESULT_IND,
+#endif
+
+#ifdef FEATURE_WLAN_CH_AVOID
+  WDI_CH_AVOID_IND,
+#endif /* FEATURE_WLAN_CH_AVOID */
+
   WDI_MAX_IND
 }WDI_LowLevelIndEnumType;
 
@@ -638,6 +647,84 @@ typedef struct
     wpt_uint32 patternIdBitmap;
 } WDI_PeriodicTxPtrnFwIndType;
 
+#ifdef FEATURE_WLAN_BATCH_SCAN
+/*---------------------------------------------------------------------------
+  WDI_SetBatchScanReqType
+---------------------------------------------------------------------------*/
+typedef struct
+{
+    wpt_uint32 scanFrequency;        /* how frequent to do scan default 30Sec*/
+    wpt_uint32 numberOfScansToBatch; /* number of scans to batch */
+    wpt_uint32 bestNetwork;          /* best networks in terms of rssi */
+    wpt_uint8  rfBand;               /* band to scan :
+                                      0 ->both Band, 1->2.4Ghz Only
+                                      and 2-> 5GHz Only */
+    wpt_uint32 rtt;                  /* set if required to do RTT it is not
+                                      supported in current version */
+}WDI_SetBatchScanReqType;
+
+/*---------------------------------------------------------------------------
+  WDI_SetBatchScanRspType
+---------------------------------------------------------------------------*/
+typedef struct
+{
+  /*max number of scans which FW can cache*/
+  wpt_uint32 nScansToBatch;
+}WDI_SetBatchScanRspType;
+
+/*---------------------------------------------------------------------------
+  WDI_TriggerBatchScanResultIndType
+---------------------------------------------------------------------------*/
+typedef struct
+{
+    wpt_uint32 param;
+}WDI_TriggerBatchScanResultIndType;
+
+/*---------------------------------------------------------------------------
+  WDI_StopBatchScanIndType
+---------------------------------------------------------------------------*/
+typedef struct
+{
+  /*max number of scans which FW can cache*/
+  wpt_uint32 param;
+}WDI_StopBatchScanIndType;
+
+
+/*---------------------------------------------------------------------------
+ * WDI_BatchScanResultIndType
+ *--------------------------------------------------------------------------*/
+typedef struct
+{
+    wpt_uint32   bssid[6];     /* BSSID */
+    wpt_uint32   ssid[32];     /* SSID */
+    wpt_uint32   ch;           /* Channel */
+    wpt_uint32   rssi;         /* RSSI or Level */
+    /* Timestamp when Network was found. Used to calculate age based on
+       timestamp in GET_RSP msg header */
+    wpt_uint32  timestamp;
+} tWDIBatchScanNetworkInfo, *tpWDIBatchScanNetworkInfo;
+
+typedef struct
+{
+    wpt_uint32   scanId; /*Scan List ID*/
+    /*No of AP in a Scan Result. Should be same as bestNetwork in SET_REQ msg*/
+    wpt_uint32   numNetworksInScanList;
+    /*Variable data ptr: Number of AP in Scan List*/
+    wpt_uint32    scanList[1];
+} tWDIBatchScanList, *tpWDIBatchScanList;
+
+typedef struct
+{
+    wpt_uint32      timestamp;
+    wpt_uint32      numScanLists;
+    wpt_boolean     isLastResult;
+    /* Variable Data ptr: Number of Scan Lists*/
+    wpt_uint32      scanResults[1];
+}  tWDIBatchScanResultParam, *tpWDIBatchScanResultParam;
+
+#endif
+
+
 /*---------------------------------------------------------------------------
  WDI_IbssPeerInactivityIndType
 -----------------------------------------------------------------------------*/
@@ -647,6 +734,22 @@ typedef struct
    wpt_uint8   staIdx;
    wpt_macAddr staMacAddr;
 }WDI_IbssPeerInactivityIndType;
+
+#ifdef FEATURE_WLAN_CH_AVOID
+#define WDI_CH_AVOID_MAX_RANGE   4
+
+typedef struct
+{
+   wpt_uint32 startFreq;
+   wpt_uint32 endFreq;
+} WDI_ChAvoidFreqType;
+
+typedef struct
+{
+   wpt_uint32          avoidRangeCount;
+   WDI_ChAvoidFreqType avoidFreqRange[WDI_CH_AVOID_MAX_RANGE];
+} WDI_ChAvoidIndType;
+#endif /* FEATURE_WLAN_CH_AVOID */
 
 /*---------------------------------------------------------------------------
   WDI_LowLevelIndType
@@ -707,6 +810,15 @@ typedef struct
 
     /* Periodic TX Pattern FW Indication */
     WDI_PeriodicTxPtrnFwIndType  wdiPeriodicTxPtrnFwInd;
+
+#ifdef FEATURE_WLAN_BATCH_SCAN
+    /*batch scan result indication from FW*/
+    void *pBatchScanResult;
+#endif
+
+#ifdef FEATURE_WLAN_CH_AVOID
+    WDI_ChAvoidIndType          wdiChAvoidInd;
+#endif /* FEATURE_WLAN_CH_AVOID */
   }  wdiIndicationData;
 }WDI_LowLevelIndType;
 
@@ -2518,49 +2630,6 @@ typedef struct
   void*             pUserData;
 }WDI_DelBAReqParamsType;
 
-/*---------------------------------------------------------------------------
-  WDI_UpdateChannelReqinfoType
----------------------------------------------------------------------------*/
-typedef struct
-{
-    /** primary 20 MHz channel frequency in mhz */
-  wpt_uint32 mhz;
-  /** Center frequency 1 in MHz*/
-  wpt_uint32 band_center_freq1;
-  /** Center frequency 2 in MHz - valid only for 11acvht 80plus80 mode*/
-  wpt_uint32 band_center_freq2;
-  /* The first 26 bits are a bit mask to indicate any channel flags,
-     (see WLAN_HAL_CHAN_FLAG*)
-     The last 6 bits indicate the mode (see tChannelPhyModeType)*/
-  wpt_uint32 channel_info;
-  /** contains min power, max power, reg power and reg class id. */
-  wpt_uint32 reg_info_1;
-  /** contains antennamax */
-  wpt_uint32 reg_info_2;
-}WDI_UpdateChannelReqinfoType;
-
-typedef struct
-{
-    wpt_uint8 numchan;
-    WDI_UpdateChannelReqinfoType *pchanParam;
-}WDI_UpdateChannelReqType;
-/*---------------------------------------------------------------------------
-  WDI_UpdateChReqParamsType
----------------------------------------------------------------------------*/
-typedef struct
-{
-  /*BA Info */
-  WDI_UpdateChannelReqType  wdiUpdateChanParams;
-
-  /*Request status callback offered by UMAC - it is called if the current
-    req has returned PENDING as status; it delivers the status of sending
-    the message over the BUS */
-  WDI_ReqStatusCb   wdiReqStatusCB;
-
-  /*The user data passed in by UMAC, it will be sent back when the above
-    function pointer will be called */
-  void*             pUserData;
-}WDI_UpdateChReqParamsType;
 
 /*---------------------------------------------------------------------------
   WDI_SwitchCHRspParamsType
@@ -3374,21 +3443,6 @@ typedef struct
    function pointer will be called */ 
    void*                    pUserData; 
 }WDI_EnterBmpsReqParamsType;
-
-/*---------------------------------------------------------------------------
-  WDI_EnterImpsReqParamsType
-  Enter IMPS parameters passed to WDI from WDA
----------------------------------------------------------------------------*/
-typedef struct
-{
-   /*Request status callback offered by UMAC - it is called if the current req
-   has returned PENDING as status; it delivers the status of sending the message
-   over the BUS */
-   WDI_ReqStatusCb          wdiReqStatusCB;
-   /*The user data passed in by UMAC, it will be sent back when the above
-   function pointer will be called */
-   void*                    pUserData;
-}WDI_EnterImpsReqParamsType;
 
 /*---------------------------------------------------------------------------
   WDI_EnterBmpsReqParamsType
@@ -6767,9 +6821,6 @@ typedef void  (*WDI_UpdateScanParamsCb)(WDI_Status  wdiStatus,
                                         void*       pUserData);
 #endif // FEATURE_WLAN_SCAN_PNO
 
-typedef void  (*WDI_UpdateChannelRspCb)(WDI_Status  wdiStatus,
-                                        void*       pUserData);
-
 #ifdef WLAN_FEATURE_ROAM_SCAN_OFFLOAD
 /*---------------------------------------------------------------------------
    WDI_RoamOffloadScanCb
@@ -7053,6 +7104,31 @@ typedef void  (*WDI_UpdateVHTOpModeCb)(WDI_Status   wdiStatus,
 typedef void  (*WDI_LphbCfgCb)(WDI_Status   wdiStatus,
                                 void*        pUserData);
 #endif /* FEATURE_WLAN_LPHB */
+
+#ifdef FEATURE_WLAN_BATCH_SCAN
+/*---------------------------------------------------------------------------
+   WDI_SetBatchScanCb
+
+   DESCRIPTION
+
+   This callback is invoked by DAL when it has received a get batch scan
+   response from the underlying device.
+
+   PARAMETERS
+
+    IN
+    wdiStatus:  response status received from HAL
+    pUserData:  user data
+
+
+
+  RETURN VALUE
+    The result code associated with performing the operation
+---------------------------------------------------------------------------*/
+typedef void (*WDI_SetBatchScanCb)(void *pData, WDI_SetBatchScanRspType *pRsp);
+
+#endif
+
 
 /*========================================================================
  *     Function Declarations and Documentation
@@ -8214,7 +8290,6 @@ WDI_SetPwrSaveCfgReq
 WDI_Status 
 WDI_EnterImpsReq
 (
-   WDI_EnterImpsReqParamsType *pwdiEnterImpsReqParams,
    WDI_EnterImpsRspCb  wdiEnterImpsRspCb,
    void*                   pUserData
 );
@@ -8939,34 +9014,7 @@ WDI_SwitchChReq
   void*                      pUserData
 );
 
-/**
- @brief WDI_UpdateChannelReq will be called when the upper MAC
-        wants to update the channel list on change in country code.
 
-        In state BUSY this request will be queued. Request won't
-        be allowed in any other state.
-
- WDI_UpdateChannelReq must have been called.
-
- @param wdiUpdateChannelReqParams: the updated channel parameters
-                      as specified by the Device Interface
-
-        wdiUpdateChannelRspCb: callback for passing back the
-        response of the update channel operation received from
-        the device
-
-        pUserData: user data will be passed back with the
-        callback
-
- @return Result of the function call
-*/
-WDI_Status
-WDI_UpdateChannelReq
-(
-  WDI_UpdateChReqParamsType *pwdiUpdateChannelReqParams,
-  WDI_UpdateChannelRspCb     wdiUpdateChannelRspCb,
-  void*                     pUserData
-);
 
 /**
  @brief WDI_ConfigSTAReq will be called when the upper MAC 
@@ -9239,24 +9287,6 @@ wpt_boolean WDI_IsHwFrameTxTranslationCapable
 (
   wpt_uint8 uSTAIdx
 );
-
-
-/**
- @brief WDI_IsSelfSTA - check if staid is self sta index
-
- @param  pWDICtx:   pointer to the WLAN DAL context
-         ucSTAIdx:  station index
-
- @return Result of the function call
-*/
-
-wpt_boolean
-WDI_IsSelfSTA
-(
-   void*  pWDICtx,
-   wpt_uint8 ucSTAIdx
-);
-
 
 #ifdef WLAN_FEATURE_VOWIFI_11R
 /**
@@ -10058,6 +10088,53 @@ WDI_Status WDI_LPHBConfReq
    WDI_LphbCfgCb lphbCfgCb
 );
 #endif /* FEATURE_WLAN_LPHB */
+
+#ifdef FEATURE_WLAN_BATCH_SCAN
+/**
+ @brief WDI_SetBatchScanReq
+    This API is called to set batch scan request in FW
+
+ @param pBatchScanReqParam : pointer to set batch scan re param
+        usrData : Client context
+        setBatchScanRspCb : set batch scan resp callback
+ @see
+ @return SUCCESS or FAIL
+*/
+WDI_Status WDI_SetBatchScanReq
+(
+   void *pBatchScanReqParam,
+   void *usrData,
+   WDI_SetBatchScanCb setBatchScanRspCb
+);
+
+/**
+ @brief WDI_StopBatchScanInd
+
+ @param none
+
+ @see
+
+ @return Status of the request
+*/
+WDI_Status
+WDI_StopBatchScanInd(WDI_StopBatchScanIndType *pWdiReq);
+
+/**
+ @brief WDI_TriggerBatchScanResultInd
+    This API is called to pull batch scan result from FW
+
+ @param pBatchScanReqParam : pointer to trigger batch scan ind param
+        usrData : Client context
+        setBatchScanRspCb : get batch scan resp callback
+ @see
+ @return SUCCESS or FAIL
+*/
+WDI_Status
+WDI_TriggerBatchScanResultInd(WDI_TriggerBatchScanResultIndType *pWdiReq);
+
+
+#endif /*FEATURE_WLAN_BATCH_SCAN*/
+
 #ifdef __cplusplus
  }
 #endif 

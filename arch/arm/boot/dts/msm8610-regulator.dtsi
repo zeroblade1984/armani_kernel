@@ -1,4 +1,4 @@
-/* Copyright (c) 2012-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2012-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -36,22 +36,47 @@
 		interrupts = <0 15 0>;
 		regulator-name = "apc_corner";
 		regulator-min-microvolt = <1>;
-		regulator-max-microvolt = <12>;
+		regulator-max-microvolt = <3>;
 
 		qcom,pvs-fuse-redun-sel = <53 25 3 2 1>;
 		qcom,pvs-fuse = <23 6 5 1>;
 		qcom,pvs-fuse-redun = <61 47 5 1>;
 
-		qcom,pvs-init-voltage = <1275000 1275000 1275000 1275000 1275000
-					1275000 1275000 1275000 1275000 1275000
-					1275000 1275000 1275000 1275000 1275000
-					1275000 1275000 1275000 1275000 1275000
-					1275000 1275000 1275000 1275000 1275000
-					1275000 1275000 1275000 1275000 1275000
-					1275000 1275000>;
-		qcom,pvs-corner-ceiling-slow = <1050000 1150000 1275000>;
-		qcom,pvs-corner-ceiling-nom  = <1050000 1075000 1275000>;
-		qcom,pvs-corner-ceiling-fast = <1050000 1050000 1275000>;
+		qcom,pvs-voltage-table =
+			<1050000 1150000 1275000>,
+			<1050000 1150000 1275000>,
+			<1050000 1150000 1275000>,
+			<1050000 1150000 1275000>,
+			<1050000 1150000 1275000>,
+			<1050000 1150000 1275000>,
+			<1050000 1150000 1275000>,
+			<1050000 1150000 1275000>,
+			<1050000 1150000 1275000>,
+			<1050000 1150000 1275000>,
+			<1050000 1150000 1275000>,
+			<1050000 1150000 1275000>,
+			<1050000 1150000 1275000>,
+			<1050000 1150000 1275000>,
+			<1050000 1150000 1275000>,
+			<1050000 1150000 1275000>,
+			<1050000 1150000 1275000>,
+			<1050000 1150000 1275000>,
+			<1050000 1150000 1275000>,
+			<1050000 1150000 1275000>,
+			<1050000 1150000 1275000>,
+			<1050000 1150000 1275000>,
+			<1050000 1150000 1275000>,
+			<1050000 1150000 1275000>,
+			<1050000 1150000 1275000>,
+			<1050000 1150000 1275000>,
+			<1050000 1150000 1275000>,
+			<1050000 1150000 1275000>,
+			<1050000 1150000 1275000>,
+			<1050000 1150000 1275000>,
+			<1050000 1150000 1275000>,
+			<1050000 1150000 1275000>;
+		qcom,cpr-voltage-ceiling = <1050000 1150000 1275000>;
+		qcom,cpr-voltage-floor = <1050000 1050000 1275000>;
 		vdd-apc-supply = <&pm8110_s2>;
 
 		vdd-mx-supply = <&pm8110_l3_ao>;
@@ -83,7 +108,6 @@
 		qcom,cpr-fuse-redun-bp-scheme = <25>;
 		qcom,cpr-fuse-redun-target-quot = <32 12 0>;
 		qcom,cpr-fuse-redun-ro-sel = <44 26 29>;
-		qcom,cpr-corner-map = <1 1 2 2 3 3 3 3 3 3 3 3>;
 
 		qcom,cpr-enable;
 	};

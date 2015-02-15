@@ -493,6 +493,9 @@
 #define RBBM_RBBM_CTL_ENABLE_PWR_CTR0  BIT(16)
 #define RBBM_RBBM_CTL_ENABLE_PWR_CTR1  BIT(17)
 
+/* Bit flag for RBMM_PERFCTR_CTL */
+#define RBBM_PERFCTR_CTL_ENABLE BIT(0)
+
 /* Various flags used by the context switch code */
 
 #define SP_MULTI 0
@@ -789,6 +792,7 @@
 #define VBIF_PERF_CNT_1_SEL_MASK 0x7f00
 
 /* VBIF countables */
+#define VBIF_AXI_TOTAL_BEATS 85
 #define VBIF_DDR_TOTAL_CYCLES 110
 
 #endif

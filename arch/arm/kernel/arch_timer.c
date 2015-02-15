@@ -480,7 +480,7 @@ static int __init arch_timer_mem_register(void)
 	if (!clk)
 		return -ENOMEM;
 
-	clk->features = CLOCK_EVT_FEAT_ONESHOT;
+	clk->features = CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_DYNIRQ;
 	clk->name = "arch_mem_timer";
 	clk->rating = 400;
 	clk->set_mode = arch_timer_set_mode_mem;
@@ -493,8 +493,8 @@ static int __init arch_timer_mem_register(void)
 	clockevents_config_and_register(clk, arch_timer_rate,
 					0xf, 0x7fffffff);
 
-	err = request_irq(arch_timer_spi, arch_timer_handler_mem, 0,
-		"arch_timer", clk);
+	err = request_irq(arch_timer_spi, arch_timer_handler_mem,
+			IRQF_TIMER, "arch_timer", clk);
 
 	return err;
 }

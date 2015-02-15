@@ -1,4 +1,4 @@
-/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -55,6 +55,7 @@
 
 #define MDP3_REG_HW_VERSION				0x0070
 #define MDP3_REG_SW_RESET				0x0074
+#define MDP3_REG_SEL_CLK_OR_HCLK_TEST_BUS		0x007C
 
 /*EBI*/
 #define MDP3_REG_EBI2_LCD0				0x003c
@@ -119,6 +120,47 @@
 
 /*DMA MASK*/
 #define MDP3_DMA_IBUF_FORMAT_MASK 0x06000000
+#define MDP3_DMA_PACK_PATTERN_MASK 0x00003f00
+
+/*MISR*/
+#define MDP3_REG_MODE_CLK				0x000D0000
+#define MDP3_REG_MISR_RESET_CLK			0x000D0004
+#define MDP3_REG_EXPORT_MISR_CLK			0x000D0008
+#define MDP3_REG_MISR_CURR_VAL_CLK			0x000D000C
+#define MDP3_REG_MODE_HCLK				0x000D0100
+#define MDP3_REG_MISR_RESET_HCLK			0x000D0104
+#define MDP3_REG_EXPORT_MISR_HCLK			0x000D0108
+#define MDP3_REG_MISR_CURR_VAL_HCLK			0x000D010C
+#define MDP3_REG_MODE_DCLK				0x000D0200
+#define MDP3_REG_MISR_RESET_DCLK			0x000D0204
+#define MDP3_REG_EXPORT_MISR_DCLK			0x000D0208
+#define MDP3_REG_MISR_CURR_VAL_DCLK			0x000D020C
+#define MDP3_REG_CAPTURED_DCLK				0x000D0210
+#define MDP3_REG_MISR_CAPT_VAL_DCLK			0x000D0214
+#define MDP3_REG_MODE_TVCLK				0x000D0300
+#define MDP3_REG_MISR_RESET_TVCLK			0x000D0304
+#define MDP3_REG_EXPORT_MISR_TVCLK			0x000D0308
+#define MDP3_REG_MISR_CURR_VAL_TVCLK			0x000D030C
+#define MDP3_REG_CAPTURED_TVCLK			0x000D0310
+#define MDP3_REG_MISR_CAPT_VAL_TVCLK			0x000D0314
+
+/* Select DSI operation type(CMD/VIDEO) */
+#define MDP3_REG_MODE_DSI_PCLK				0x000D0400
+#define MDP3_REG_MODE_DSI_PCLK_BLOCK_DSI_CMD		0x10
+#define MDP3_REG_MODE_DSI_PCLK_BLOCK_DSI_VIDEO1	0x20
+#define MDP3_REG_MODE_DSI_PCLK_BLOCK_DSI_VIDEO2	0x30
+/* RESET DSI MISR STATE */
+#define MDP3_REG_MISR_RESET_DSI_PCLK			0x000D0404
+
+/* For reading MISR State(1) and driving data on test bus(0) */
+#define MDP3_REG_EXPORT_MISR_DSI_PCLK			0x000D0408
+/* Read MISR signature */
+#define MDP3_REG_MISR_CURR_VAL_DSI_PCLK		0x000D040C
+
+/* MISR status Bit0 (1) Capture Done */
+#define MDP3_REG_CAPTURED_DSI_PCLK			0x000D0410
+#define MDP3_REG_MISR_CAPT_VAL_DSI_PCLK		0x000D0414
+#define MDP3_REG_MISR_TESTBUS_CAPT_VAL			0x000D0600
 
 /*interface*/
 #define MDP3_REG_LCDC_EN				0xE0000
@@ -230,6 +272,8 @@
 #define MDP3_PPP_BLEND_PARAM		0x1014C
 
 #define MDP3_PPP_BLEND_BG_ALPHA_SEL	0x70010
+
+#define MDP3_PPP_ACTIVE BIT(0)
 
 /*interrupt mask*/
 

@@ -54,6 +54,7 @@ struct hdmi_tx_ctrl {
 	struct hdmi_audio audio_data;
 
 	struct mutex mutex;
+	struct mutex lut_lock;
 	struct kobject *kobj;
 	struct switch_dev sdev;
 	struct switch_dev audio_sdev;
@@ -79,6 +80,7 @@ struct hdmi_tx_ctrl {
 	struct work_struct power_off_work;
 
 	bool hdcp_feature_on;
+	bool ds_registered;
 	u32 present_hdcp;
 
 	u8 spd_vendor_name[9];

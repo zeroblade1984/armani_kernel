@@ -109,7 +109,7 @@ config S5K3L1YX
 		4 mipi lanes, preview config = 1984 * 1508 at 30 fps,
 		snapshot config = 4000 * 3000 at 20 fps,
 		hfr video at 60, 90 and 120 fps.
-
+		
 config S5K3H2YX
 	bool "Sensor S5K3H2YX (BAYER 8M)"
 	depends on MSMB_CAMERA
@@ -153,7 +153,7 @@ config OV9724
 		preview and snapshot config at 1280*720 at 30 fps,
 		hfr video at 60, 90 and 120 fps. This sensor driver does
 		not support auto focus.
-
+		
 config OV9760
 	bool "Sensor OV9760 (BAYER 1.6M)"
 	depends on MSMB_CAMERA

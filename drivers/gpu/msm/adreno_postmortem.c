@@ -22,6 +22,7 @@
 #include "adreno_ringbuffer.h"
 #include "kgsl_cffdump.h"
 #include "kgsl_pwrctrl.h"
+#include "adreno_trace.h"
 
 #include "a2xx_reg.h"
 #include "a3xx_reg.h"
@@ -395,8 +396,8 @@ EXPORT_SYMBOL(adreno_dump_fields);
 
 int adreno_dump(struct kgsl_device *device, int manual)
 {
-	unsigned int cp_ib1_base, cp_ib1_bufsz;
-	unsigned int cp_ib2_base, cp_ib2_bufsz;
+	unsigned int cp_ib1_base;
+	unsigned int cp_ib2_base;
 	phys_addr_t pt_base, cur_pt_base;
 	unsigned int cp_rb_base, cp_rb_ctrl, rb_count;
 	unsigned int cp_rb_wptr, cp_rb_rptr;
@@ -406,12 +407,9 @@ int adreno_dump(struct kgsl_device *device, int manual)
 	const uint32_t *rb_vaddr;
 	int num_item = 0;
 	int read_idx, write_idx;
-	unsigned int ts_processed = 0;
-	unsigned int curr_global_ts = 0;
+	unsigned int ts_processed = 0xdeaddead;
 	struct kgsl_context *context;
 	unsigned int context_id;
-	static char pid_name[TASK_COMM_LEN] = "unknown";
-	unsigned int rbbm_status;
 
 	static struct ib_list ib_list;
 
@@ -421,16 +419,10 @@ int adreno_dump(struct kgsl_device *device, int manual)
 
 	mb();
 
-	if (device->pm_dump_enable) {
-		msm_clk_dump_debug_info();
+	msm_clk_dump_debug_info();
 
-		if (adreno_dev->gpudev->postmortem_dump)
-			adreno_dev->gpudev->postmortem_dump(adreno_dev);
-	}
-
-	kgsl_regread(device,
-			adreno_getreg(adreno_dev, ADRENO_REG_RBBM_STATUS),
-			&rbbm_status);
+	if (adreno_dev->gpudev->postmortem_dump)
+		adreno_dev->gpudev->postmortem_dump(adreno_dev);
 
 	pt_base = kgsl_mmu_get_current_ptbase(&device->mmu);
 	cur_pt_base = pt_base;
@@ -452,59 +444,22 @@ int adreno_dump(struct kgsl_device *device, int manual)
 		adreno_getreg(adreno_dev, ADRENO_REG_CP_IB1_BASE),
 		&cp_ib1_base);
 	kgsl_regread(device,
-		adreno_getreg(adreno_dev, ADRENO_REG_CP_IB1_BUFSZ),
-		&cp_ib1_bufsz);
-	kgsl_regread(device,
 		adreno_getreg(adreno_dev, ADRENO_REG_CP_IB2_BASE),
 		&cp_ib2_base);
-	kgsl_regread(device,
-		adreno_getreg(adreno_dev, ADRENO_REG_CP_IB2_BUFSZ),
-		&cp_ib2_bufsz);
 
 	kgsl_sharedmem_readl(&device->memstore,
 			(unsigned int *) &context_id,
 			KGSL_MEMSTORE_OFFSET(KGSL_MEMSTORE_GLOBAL,
 				current_context));
-	context = idr_find(&device->context_idr, context_id);
-	if (context)
+
+	context = kgsl_context_get(device, context_id);
+
+	if (context) {
 		ts_processed = kgsl_readtimestamp(device, context,
-					  KGSL_TIMESTAMP_RETIRED);
-
-	/* If postmortem dump is not enabled, dump minimal set and return */
-	if (!device->pm_dump_enable) {
-		struct task_struct *task = NULL;
-		/* Read the current global timestamp here */
-		kgsl_sharedmem_readl(&device->memstore,
-			&curr_global_ts,
-			KGSL_MEMSTORE_OFFSET(KGSL_MEMSTORE_GLOBAL,
-			eoptimestamp));
-
-		if (context)
-			task = find_task_by_vpid(context->pid);
-
-		if (task)
-			get_task_comm(pid_name, task);
-
-		KGSL_LOG_DUMP(device,
-			"Proc %s, ctxt_id %d ts %d triggered fault tolerance"
-			" on global ts %d\n", pid_name,
-			context ? context->id : 0,
-			ts_processed ? ts_processed + 1 : 0,
-			curr_global_ts ? curr_global_ts + 1 : 0);
-
-		KGSL_LOG_DUMP(device,
-			"STATUS %08X | IB1:%08X/%08X | IB2: %08X/%08X"
-			" | RPTR: %04X | WPTR: %04X\n",
-			rbbm_status,  cp_ib1_base, cp_ib1_bufsz, cp_ib2_base,
-			cp_ib2_bufsz, cp_rb_rptr, cp_rb_wptr);
-
-		return 0;
-	}
-
-	if (ts_processed)
+						  KGSL_TIMESTAMP_RETIRED);
 		KGSL_LOG_DUMP(device, "FT CTXT: %d  TIMESTM RTRD: %08X\n",
 				context->id, ts_processed);
-	else
+	} else
 		KGSL_LOG_DUMP(device, "BAD CTXT: %d\n", context_id);
 
 	kgsl_context_put(context);
@@ -665,5 +620,9 @@ int adreno_dump(struct kgsl_device *device, int manual)
 error_vfree:
 	vfree(rb_copy);
 end:
+	/* Restart the dispatcher after a manually triggered dump */
+	if (manual)
+		adreno_dispatcher_start(device);
+
 	return result;
 }

@@ -78,6 +78,8 @@
 
 #define KGSL_MEMFREE_HIST_SIZE	((int)(PAGE_SIZE * 2))
 
+#define KGSL_MAX_NUMIBS 100000
+
 struct kgsl_memfree_hist_elem {
 	unsigned int pid;
 	unsigned int gpuaddr;
@@ -141,6 +143,7 @@ extern struct kgsl_driver kgsl_driver;
 
 struct kgsl_pagetable;
 struct kgsl_memdesc;
+struct kgsl_cmdbatch;
 
 struct kgsl_memdesc_ops {
 	int (*vmflags)(struct kgsl_memdesc *);
@@ -206,24 +209,8 @@ struct kgsl_mem_entry {
 #define MMU_CONFIG 1
 #endif
 
-void kgsl_hang_intr_work(struct work_struct *work);
-void kgsl_hang_check(struct work_struct *work);
 void kgsl_mem_entry_destroy(struct kref *kref);
 int kgsl_postmortem_dump(struct kgsl_device *device, int manual);
-
-static inline void kgsl_atomic_set(atomic_t *addr, unsigned int val)
-{
-	atomic_set(addr, val);
-	/* make sure above write is posted */
-	wmb();
-}
-
-static inline int kgsl_atomic_read(atomic_t *addr)
-{
-	/* make sure below read is read from memory */
-	rmb();
-	return atomic_read(addr);
-}
 
 struct kgsl_mem_entry *kgsl_get_mem_entry(struct kgsl_device *device,
 		phys_addr_t ptbase, unsigned int gpuaddr, unsigned int size);
@@ -253,7 +240,7 @@ void kgsl_trace_regwrite(struct kgsl_device *device, unsigned int offset,
 		unsigned int value);
 
 void kgsl_trace_issueibcmds(struct kgsl_device *device, int id,
-		struct kgsl_ibdesc *ibdesc, int numibs,
+		struct kgsl_cmdbatch *cmdbatch,
 		unsigned int timestamp, unsigned int flags,
 		int result, unsigned int type);
 

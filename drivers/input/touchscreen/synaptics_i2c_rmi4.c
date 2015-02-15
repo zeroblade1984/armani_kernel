@@ -2268,10 +2268,10 @@ static int synaptics_rmi4_query_device(struct synaptics_rmi4_data *rmi4_data)
 						&rmi->support_fn_list_mutex);
 				} else {
 					if (fhandler->fn_number ==
-							SYNAPTICS_RMI4_F1A)
+							SYNAPTICS_RMI4_F1A) {
 						synaptics_rmi4_f1a_kfree(
 							fhandler);
-					else {
+					} else {
 						kfree(fhandler->data);
 						kfree(fhandler->extra);
 					}

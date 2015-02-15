@@ -82,12 +82,12 @@
 		interrupts = <0 208 0>;
 		qcom,direct-connect-irqs = <8>;
 	};
-
-        w1-gpio {
-                compatible = "qcom,w1-gpio";
-                qcom,gpio-pin = <567>; /* BAT_ID Connects to mpp-8*/
-                qcom,is-open-drain = <0>;
-        };
+	
+	w1-gpio {
+           compatible = "qcom,w1-gpio";
+           qcom,gpio-pin = <567>; /* BAT_ID Connects to mpp-8*/
+           qcom,is-open-drain = <0>;
+    };
 
 	qcom,mpm2-sleep-counter@fc4a3000 {
 		compatible = "qcom,mpm2-sleep-counter";
@@ -231,13 +231,6 @@
 				<86 512 500 800>;
 	};
 
-	serial@f995e000 {
-		compatible = "qcom,msm-lsuart-v14";
-		reg = <0xf995e000 0x1000>;
-		interrupts = <0 114 0>;
-		status = "disabled";
-	};
-
 	qcom,msm-imem@fe805000 {
 		compatible = "qcom,msm-imem";
 		reg = <0xfe805000 0x1000>; /* Address and size of IMEM */
@@ -296,6 +289,7 @@
 		qcom,hsusb-otg-otg-control = <2>;
 		qcom,dp-manual-pullup;
 		qcom,ahb-async-bridge-bypass;
+		qcom,usbin-vadc = <&pm8226_vadc>;
 
 		qcom,msm-bus,name = "usb";
 		qcom,msm-bus,num-cases = <3>;
@@ -441,19 +435,20 @@
 		qcom,tapan-codec-9302;
 	};
 
-	qcom,msm-pcm {
-		compatible = "qcom,msm-pcm-dsp";
-		qcom,msm-pcm-dsp-id = <0>;
+	qti,msm-pcm {
+		compatible = "qti,msm-pcm-dsp";
+		qti,msm-pcm-dsp-id = <0>;
 	};
 
 	qcom,msm-pcm-routing {
 		compatible = "qcom,msm-pcm-routing";
 	};
 
-	qcom,msm-pcm-low-latency {
-		compatible = "qcom,msm-pcm-dsp";
-		qcom,msm-pcm-dsp-id = <1>;
-		qcom,msm-pcm-low-latency;
+	qti,msm-pcm-low-latency {
+		compatible = "qti,msm-pcm-dsp";
+		qti,msm-pcm-dsp-id = <1>;
+		qti,msm-pcm-low-latency;
+		qti,latency-level = "regular";
 	};
 
 	qcom,msm-pcm-lpa {
@@ -462,6 +457,10 @@
 
 	qcom,msm-compr-dsp {
 		compatible = "qcom,msm-compr-dsp";
+	};
+
+	qcom,msm-compress-dsp {
+		compatible = "qcom,msm-compress-dsp";
 	};
 
 	qcom,msm-voip-dsp {
@@ -765,6 +764,7 @@
 
 		qcom,bus-width = <8>;
 
+		qcom,cpu-dma-latency-us = <701>;
 		qcom,msm-bus,name = "sdcc1";
 		qcom,msm-bus,num-cases = <8>;
 		qcom,msm-bus,num-paths = <1>;
@@ -792,6 +792,7 @@
 
 		qcom,bus-width = <8>;
 
+		qcom,cpu-dma-latency-us = <701>;
 		qcom,msm-bus,name = "sdhc1";
 		qcom,msm-bus,num-cases = <8>;
 		qcom,msm-bus,num-paths = <1>;
@@ -822,6 +823,7 @@
 
 		qcom,bus-width = <4>;
 
+		qcom,cpu-dma-latency-us = <701>;
 		qcom,msm-bus,name = "sdcc2";
 		qcom,msm-bus,num-cases = <8>;
 		qcom,msm-bus,num-paths = <1>;
@@ -849,6 +851,7 @@
 
 		qcom,bus-width = <4>;
 
+		qcom,cpu-dma-latency-us = <701>;
 		qcom,msm-bus,name = "sdhc2";
 		qcom,msm-bus,num-cases = <8>;
 		qcom,msm-bus,num-paths = <1>;
@@ -875,6 +878,7 @@
 		reg-names = "core_mem", "dml_mem", "bam_mem";
 
 		qcom,bus-width = <4>;
+		qcom,cpu-dma-latency-us = <701>;
 		gpios = <&msmgpio 44 0>, /* CLK */
 			<&msmgpio 43 0>, /* CMD */
 			<&msmgpio 42 0>, /* DATA0 */
@@ -918,6 +922,7 @@
 		reg-names = "hc_mem", "core_mem";
 
 		qcom,bus-width = <4>;
+		qcom,cpu-dma-latency-us = <701>;
 		gpios = <&msmgpio 44 0>, /* CLK */
 			<&msmgpio 43 0>, /* CMD */
 			<&msmgpio 42 0>, /* DATA0 */
@@ -980,6 +985,9 @@
 		interrupt-names = "qup_err_intr";
 		qcom,i2c-bus-freq = <400000>;
 		qcom,i2c-src-freq = <19200000>;
+		qcom,sda-gpio = <&msmgpio 10 0>;
+		qcom,scl-gpio = <&msmgpio 11 0>;
+		qcom,master-id = <86>;
 	};
 	i2c@f9926000 { /* BLSP-1 QUP-4 */
 		cell-index = <0>;
@@ -1007,27 +1015,62 @@
 		qcom,sda-gpio = <&msmgpio 18 0>;
 		qcom,scl-gpio = <&msmgpio 19 0>;
 	};
-
+	
 	i2c@f9928000 { /* BLSP1 QUP6 */
-                cell-index = <6>;
-                compatible = "qcom,i2c-qup";
-                #address-cells = <1>;
-                #size-cells = <0>;
-                reg-names = "qup_phys_addr";
-                reg = <0xf9928000 0x1000>;
-                interrupt-names = "qup_err_intr";
-                interrupts = <0 100 0>;
-                qcom,i2c-bus-freq = <384000>;
-                qcom,i2c-src-freq = <19200000>;
-                qcom,sda-gpio = <&msmgpio 22 0>;
-                qcom,scl-gpio = <&msmgpio 23 0>;
-        };
+        cell-index = <6>;
+        compatible = "qcom,i2c-qup";
+        #address-cells = <1>;
+        #size-cells = <0>;
+        reg-names = "qup_phys_addr";
+        reg = <0xf9928000 0x1000>;
+        interrupt-names = "qup_err_intr";
+        interrupts = <0 100 0>;
+        qcom,i2c-bus-freq = <384000>;
+        qcom,i2c-src-freq = <19200000>;
+        qcom,sda-gpio = <&msmgpio 22 0>;
+        qcom,scl-gpio = <&msmgpio 23 0>;
+    };
 
-	qcom,acpuclk@f9011050 {
-		compatible = "qcom,acpuclk-a7";
+	qcom,clock-a7@f9011050 {
+		compatible = "qcom,clock-a7-8226";
 		reg = <0xf9011050 0x8>;
-		reg-names = "rcg_base";
-		a7_cpu-supply = <&apc_vreg_corner>;
+		reg-names = "rcg-base";
+		clock-names = "clk-4", "clk-5";
+		qcom,speed0-bin-v0 =
+			<         0 0>,
+			< 384000000 1>,
+			< 787200000 2>,
+			<1190400000 3>;
+
+		cpu-vdd-supply = <&apc_vreg_corner>;
+	};
+
+	qcom,cpubw {
+		compatible = "qcom,cpubw";
+		qcom,cpu-mem-ports = <1 512>;
+		qcom,bw-tbl =
+			< 1525 /* 200 MHz */ >,
+			< 2441 /* 320 MHz */ >,
+			< 3051 /* 400 MHz */ >,
+			< 4066 /* 533 MHz */ >;
+	};
+
+	qcom,msm-cpufreq@0 {
+		reg = <0 4>;
+		compatible = "qcom,msm-cpufreq";
+		qcom,cpufreq-table =
+			<  300000 1525 >,
+			<  384000 1525 >,
+			<  600000 1525 >,
+			<  787200 1525 >,
+			<  998400 4066 >,
+			< 1094400 4066 >,
+			< 1190400 4066 >,
+			< 1305600 4066 >,
+			< 1344000 4066 >,
+			< 1401600 4066 >,
+			< 1497600 4066 >,
+			< 1593600 4066 >;
 	};
 
 	qcom,ocmem@fdd00000 {
@@ -1488,6 +1531,7 @@
 		qcom,hw-settle-time = <0xf>;
 		qcom,fast-avg-setup = <0>;
 		qcom,btm-channel-number = <0x48>;
+		qcom,meas-interval-timer-idx = <2>;
 	};
 
 	chan@8 {

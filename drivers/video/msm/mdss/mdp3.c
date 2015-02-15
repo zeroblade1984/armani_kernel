@@ -38,7 +38,7 @@
 #include <linux/major.h>
 #include <linux/bootmem.h>
 #include <linux/memblock.h>
-
+#include <linux/iopoll.h>
 #include <mach/board.h>
 #include <mach/clk.h>
 #include <mach/hardware.h>
@@ -54,6 +54,10 @@
 #include "mdp3_ctrl.h"
 #include "mdp3_ppp.h"
 #include "mdss_debug.h"
+
+#define MISR_POLL_SLEEP                 2000
+#define MISR_POLL_TIMEOUT               32000
+#define MDP3_REG_CAPTURED_DSI_PCLK_MASK 1
 
 #define MDP_CORE_HW_VERSION	0x03040310
 struct mdp3_hw_resource *mdp3_res;
@@ -1139,6 +1143,7 @@ static int mdp3_parse_dt(struct platform_device *pdev)
 
 void mdp3_batfet_ctrl(int enable)
 {
+	int rc;
 	if (!mdp3_res->batfet_required)
 		return;
 
@@ -1160,9 +1165,12 @@ void mdp3_batfet_ctrl(int enable)
 	}
 
 	if (enable)
-		regulator_enable(mdp3_res->batfet);
+		rc = regulator_enable(mdp3_res->batfet);
 	else
-		regulator_disable(mdp3_res->batfet);
+		rc = regulator_disable(mdp3_res->batfet);
+
+	if (rc < 0)
+		pr_err("%s: reg enable/disable failed", __func__);
 }
 
 static void mdp3_iommu_heap_unmap_iommu(struct mdp3_iommu_meta *meta)
@@ -1659,69 +1667,79 @@ u32 mdp3_fb_stride(u32 fb_index, u32 xres, int bpp)
 		return xres * bpp;
 }
 
-static int mdp3_alloc(size_t size, void **virt, unsigned long *phys)
+static int mdp3_alloc(struct msm_fb_data_type *mfd)
 {
-	int ret = 0;
+	int ret;
+	int dom;
+	void *virt;
+	unsigned long phys;
+	u32 offsets[2];
+	size_t size;
+	struct platform_device *pdev = mfd->pdev;
 
-	if (mdp3_res->ion_handle) {
-		pr_debug("memory already alloc\n");
-		*virt = mdp3_res->virt;
-		*phys = mdp3_res->phys;
-		return 0;
+	mfd->fbi->screen_base = NULL;
+	mfd->fbi->fix.smem_start = 0;
+	mfd->fbi->fix.smem_len = 0;
+
+	ret = of_property_read_u32_array(pdev->dev.of_node,
+				"qcom,memblock-reserve", offsets, 2);
+
+	if (ret) {
+		pr_err("fail to parse splash memory address\n");
+		return ret;
 	}
 
-	mdp3_res->ion_handle = ion_alloc(mdp3_res->ion_client, size,
-					SZ_1M,
-					ION_HEAP(ION_QSECOM_HEAP_ID), 0);
+	phys = offsets[0];
+	size = PAGE_ALIGN(mfd->fbi->fix.line_length *
+		mfd->fbi->var.yres_virtual);
 
-	if (!IS_ERR_OR_NULL(mdp3_res->ion_handle)) {
-		*virt = ion_map_kernel(mdp3_res->ion_client,
-					mdp3_res->ion_handle);
-		if (IS_ERR(*virt)) {
-			pr_err("map kernel error\n");
-			goto ion_map_kernel_err;
-		}
+	if (size > offsets[1]) {
+		pr_err("reserved splash memory size too small\n");
+		return -EINVAL;
+	}
 
-		ret = ion_phys(mdp3_res->ion_client, mdp3_res->ion_handle,
-				phys, &size);
-		if (ret) {
-			pr_err("%s ion_phys error\n", __func__);
-			goto ion_map_phys_err;
-		}
-
-		mdp3_res->virt = *virt;
-		mdp3_res->phys = *phys;
-		mdp3_res->size = size;
-	} else {
-		pr_err("%s ion alloc fail\n", __func__);
-		mdp3_res->ion_handle = NULL;
+	virt = phys_to_virt(phys);
+	if (unlikely(!virt)) {
+		pr_err("unable to map in splash memory\n");
 		return -ENOMEM;
 	}
 
-	return 0;
+	dom = mdp3_res->domains[MDP3_DMA_IOMMU_DOMAIN].domain_idx;
+	ret = msm_iommu_map_contig_buffer(phys, dom, 0, size, SZ_4K, 0,
+					&mfd->iova);
 
-ion_map_phys_err:
-	ion_unmap_kernel(mdp3_res->ion_client, mdp3_res->ion_handle);
-ion_map_kernel_err:
-	ion_free(mdp3_res->ion_client, mdp3_res->ion_handle);
-	mdp3_res->ion_handle = NULL;
-	mdp3_res->virt = NULL;
-	mdp3_res->phys = 0;
-	mdp3_res->size = 0;
-	return -ENOMEM;
+	if (ret) {
+		pr_err("fail to map to IOMMU %d\n", ret);
+		return ret;
+	}
+	pr_info("allocating %u bytes at %p (%lx phys) for fb %d\n",
+		size, virt, phys, mfd->index);
+
+	mfd->fbi->screen_base = virt;
+	mfd->fbi->fix.smem_start = phys;
+	mfd->fbi->fix.smem_len = size;
+
+	return 0;
 }
 
-void mdp3_free(void)
+void mdp3_free(struct msm_fb_data_type *mfd)
 {
-	pr_debug("mdp3_fbmem_free\n");
-	if (mdp3_res->ion_handle) {
-		ion_unmap_kernel(mdp3_res->ion_client, mdp3_res->ion_handle);
-		ion_free(mdp3_res->ion_client, mdp3_res->ion_handle);
-		mdp3_res->ion_handle = NULL;
-		mdp3_res->virt = NULL;
-		mdp3_res->phys = 0;
-		mdp3_res->size = 0;
+	size_t size = 0;
+	int dom;
+
+	if (!mfd->iova || !mfd->fbi->screen_base) {
+		pr_info("no fbmem allocated\n");
+		return;
 	}
+
+	size = mfd->fbi->fix.smem_len;
+	dom = mdp3_res->domains[MDP3_DMA_IOMMU_DOMAIN].domain_idx;
+	msm_iommu_unmap_contig_buffer(mfd->iova, dom, 0, size);
+
+	mfd->fbi->screen_base = NULL;
+	mfd->fbi->fix.smem_start = 0;
+	mfd->fbi->fix.smem_len = 0;
+	mfd->iova = 0;
 }
 
 int mdp3_parse_dt_splash(struct msm_fb_data_type *mfd)
@@ -1744,16 +1762,17 @@ int mdp3_parse_dt_splash(struct msm_fb_data_type *mfd)
 	mdp3_res->splash_mem_addr = offsets[0];
 	mdp3_res->splash_mem_size = offsets[1];
 
-	pr_debug("memaddr=%x size=%x\n", mdp3_res->splash_mem_addr,
+	pr_debug("memaddr=%lx size=%x\n", mdp3_res->splash_mem_addr,
 		mdp3_res->splash_mem_size);
 
 	return rc;
 }
 
-void mdp3_release_splash_memory(void)
+void mdp3_release_splash_memory(struct msm_fb_data_type *mfd)
 {
 	/* Give back the reserved memory to the system */
 	if (mdp3_res->splash_mem_addr) {
+		mdp3_free(mfd);
 		pr_debug("mdp3_release_splash_memory\n");
 		memblock_free(mdp3_res->splash_mem_addr,
 				mdp3_res->splash_mem_size);
@@ -1801,44 +1820,6 @@ static int mdp3_fb_mem_get_iommu_domain(void)
 int mdp3_get_cont_spash_en(void)
 {
 	return mdp3_res->cont_splash_en;
-}
-
-int mdp3_continuous_splash_copy(struct mdss_panel_data *pdata)
-{
-	unsigned long splash_phys, phys;
-	void *splash_virt, *virt;
-	u32 height, width, rgb_size, stride;
-	size_t size;
-	int rc;
-
-	if (pdata->panel_info.type != MIPI_VIDEO_PANEL) {
-		pr_debug("cmd mode panel, no need to copy splash image\n");
-		return 0;
-	}
-
-	rgb_size = MDP3_REG_READ(MDP3_REG_DMA_P_SIZE);
-	stride = MDP3_REG_READ(MDP3_REG_DMA_P_IBUF_Y_STRIDE);
-	stride = stride & 0x3FFF;
-	splash_phys = MDP3_REG_READ(MDP3_REG_DMA_P_IBUF_ADDR);
-
-	height = (rgb_size >> 16) & 0xffff;
-	width  = rgb_size & 0xffff;
-	size = PAGE_ALIGN(height * stride);
-	pr_debug("splash_height=%d splash_width=%d Buffer size=%d\n",
-		height, width, size);
-
-	rc = mdp3_alloc(size, &virt, &phys);
-	if (rc) {
-		pr_err("fail to allocate memory for continuous splash image\n");
-		return rc;
-	}
-
-	splash_virt = ioremap(splash_phys, stride * height);
-	memcpy(virt, splash_virt, stride * height);
-	iounmap(splash_virt);
-	MDP3_REG_WRITE(MDP3_REG_DMA_P_IBUF_ADDR, phys);
-
-	return 0;
 }
 
 static int mdp3_is_display_on(struct mdss_panel_data *pdata)
@@ -2059,6 +2040,105 @@ int mdp3_create_sysfs_link(struct device *dev)
 	return rc;
 }
 
+int mdp3_misr_get(struct mdp_misr *misr_resp)
+{
+	int result = 0, ret = -1;
+	int crc = 0;
+	pr_debug("%s CRC Capture on DSI\n", __func__);
+	switch (misr_resp->block_id) {
+	case DISPLAY_MISR_DSI0:
+		MDP3_REG_WRITE(MDP3_REG_DSI_VIDEO_EN, 0);
+		/* Sleep for one vsync after DSI video engine is disabled */
+		msleep(20);
+		/* Enable DSI_VIDEO_0 MISR Block */
+		MDP3_REG_WRITE(MDP3_REG_MODE_DSI_PCLK, 0x20);
+		/* Reset MISR Block */
+		MDP3_REG_WRITE(MDP3_REG_MISR_RESET_DSI_PCLK, 1);
+		/* Clear MISR capture done bit */
+		MDP3_REG_WRITE(MDP3_REG_CAPTURED_DSI_PCLK, 0);
+		/* Enable MDP DSI interface */
+		MDP3_REG_WRITE(MDP3_REG_DSI_VIDEO_EN, 1);
+		ret = readl_poll_timeout(mdp3_res->mdp_base +
+			MDP3_REG_CAPTURED_DSI_PCLK, result,
+			result & MDP3_REG_CAPTURED_DSI_PCLK_MASK,
+			MISR_POLL_SLEEP, MISR_POLL_TIMEOUT);
+			MDP3_REG_WRITE(MDP3_REG_MODE_DSI_PCLK, 0);
+		if (ret == 0) {
+			/* Disable DSI MISR interface */
+			MDP3_REG_WRITE(MDP3_REG_MODE_DSI_PCLK, 0x0);
+			crc = MDP3_REG_READ(MDP3_REG_MISR_CAPT_VAL_DSI_PCLK);
+			pr_debug("CRC Val %d\n", crc);
+		} else {
+			pr_err("CRC Read Timed Out\n");
+		}
+		break;
+
+	case DISPLAY_MISR_DSI_CMD:
+		/* Select DSI PCLK Domain */
+		MDP3_REG_WRITE(MDP3_REG_SEL_CLK_OR_HCLK_TEST_BUS, 0x004);
+		/* Select Block id DSI_CMD */
+		MDP3_REG_WRITE(MDP3_REG_MODE_DSI_PCLK, 0x10);
+		/* Reset MISR Block */
+		MDP3_REG_WRITE(MDP3_REG_MISR_RESET_DSI_PCLK, 1);
+		/* Drive Data on Test Bus */
+		MDP3_REG_WRITE(MDP3_REG_EXPORT_MISR_DSI_PCLK, 0);
+		/* Kikk off DMA_P */
+		MDP3_REG_WRITE(MDP3_REG_DMA_P_START, 0x11);
+		/* Wait for DMA_P Done */
+		ret = readl_poll_timeout(mdp3_res->mdp_base +
+			MDP3_REG_INTR_STATUS, result,
+			result & MDP3_INTR_DMA_P_DONE_BIT,
+			MISR_POLL_SLEEP, MISR_POLL_TIMEOUT);
+		if (ret == 0) {
+			crc = MDP3_REG_READ(MDP3_REG_MISR_CURR_VAL_DSI_PCLK);
+			pr_debug("CRC Val %d\n", crc);
+		} else {
+			pr_err("CRC Read Timed Out\n");
+		}
+		break;
+
+	default:
+		pr_err("%s CRC Capture not supported\n", __func__);
+		ret = -EINVAL;
+		break;
+	}
+
+	misr_resp->crc_value[0] = crc;
+	pr_debug("%s, CRC Capture on DSI Param Block = 0x%x, CRC 0x%x\n",
+			__func__, misr_resp->block_id, misr_resp->crc_value[0]);
+	return ret;
+}
+
+int mdp3_misr_set(struct mdp_misr *misr_req)
+{
+	int ret = 0;
+	pr_debug("%s Parameters Block = %d Cframe Count = %d CRC = %d\n",
+			__func__, misr_req->block_id, misr_req->frame_count,
+			misr_req->crc_value[0]);
+
+	switch (misr_req->block_id) {
+	case DISPLAY_MISR_DSI0:
+		pr_debug("In the case DISPLAY_MISR_DSI0\n");
+		MDP3_REG_WRITE(MDP3_REG_SEL_CLK_OR_HCLK_TEST_BUS, 1);
+		MDP3_REG_WRITE(MDP3_REG_MODE_DSI_PCLK, 0x20);
+		MDP3_REG_WRITE(MDP3_REG_MISR_RESET_DSI_PCLK, 0x1);
+		break;
+
+	case DISPLAY_MISR_DSI_CMD:
+		pr_debug("In the case DISPLAY_MISR_DSI_CMD\n");
+		MDP3_REG_WRITE(MDP3_REG_SEL_CLK_OR_HCLK_TEST_BUS, 1);
+		MDP3_REG_WRITE(MDP3_REG_MODE_DSI_PCLK, 0x10);
+		MDP3_REG_WRITE(MDP3_REG_MISR_RESET_DSI_PCLK, 0x1);
+		break;
+
+	default:
+		pr_err("%s CRC Capture not supported\n", __func__);
+		ret = -EINVAL;
+		break;
+	}
+	return ret;
+}
+
 static int mdp3_probe(struct platform_device *pdev)
 {
 	int rc;
@@ -2067,6 +2147,8 @@ static int mdp3_probe(struct platform_device *pdev)
 	.fb_mem_get_iommu_domain = mdp3_fb_mem_get_iommu_domain,
 	.panel_register_done = mdp3_panel_register_done,
 	.fb_stride = mdp3_fb_stride,
+	.fb_mem_alloc_fnc = mdp3_alloc,
+	.check_dsi_status = mdp3_check_dsi_ctrl_status,
 	};
 
 	struct mdp3_intr_cb underrun_cb = {

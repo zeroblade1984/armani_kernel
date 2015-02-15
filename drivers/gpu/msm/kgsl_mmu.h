@@ -1,4 +1,4 @@
-/* Copyright (c) 2002,2007-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2002,2007-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -133,17 +133,22 @@ struct kgsl_mmu_ops {
 	int (*mmu_close) (struct kgsl_mmu *mmu);
 	int (*mmu_start) (struct kgsl_mmu *mmu);
 	void (*mmu_stop) (struct kgsl_mmu *mmu);
-	void (*mmu_setstate) (struct kgsl_mmu *mmu,
+	int (*mmu_setstate) (struct kgsl_mmu *mmu,
 		struct kgsl_pagetable *pagetable,
 		unsigned int context_id);
-	void (*mmu_device_setstate) (struct kgsl_mmu *mmu,
+	int (*mmu_device_setstate) (struct kgsl_mmu *mmu,
 					uint32_t flags);
 	void (*mmu_pagefault) (struct kgsl_mmu *mmu);
 	phys_addr_t (*mmu_get_current_ptbase)
 			(struct kgsl_mmu *mmu);
+	void (*mmu_pagefault_resume)
+			(struct kgsl_mmu *mmu);
 	void (*mmu_disable_clk_on_ts)
-		(struct kgsl_mmu *mmu, uint32_t ts, bool ts_valid);
+		(struct kgsl_mmu *mmu,
+		uint32_t ts, int ctx_id);
 	int (*mmu_enable_clk)
+		(struct kgsl_mmu *mmu, int ctx_id);
+	void (*mmu_disable_clk)
 		(struct kgsl_mmu *mmu, int ctx_id);
 	phys_addr_t (*mmu_get_default_ttbr0)(struct kgsl_mmu *mmu,
 				unsigned int unit_id,
@@ -169,6 +174,7 @@ struct kgsl_mmu_ops {
 	unsigned int (*mmu_sync_unlock)
 			(struct kgsl_mmu *mmu, unsigned int *cmds);
 	int (*mmu_hw_halt_supported)(struct kgsl_mmu *mmu, int iommu_unit_num);
+	int (*mmu_set_pf_policy)(struct kgsl_mmu *mmu, unsigned int pf_policy);
 };
 
 struct kgsl_mmu_pt_ops {
@@ -198,7 +204,7 @@ struct kgsl_mmu {
 	struct kgsl_pagetable  *hwpagetable;
 	const struct kgsl_mmu_ops *mmu_ops;
 	void *priv;
-	int fault;
+	atomic_t fault;
 	unsigned long pt_base;
 	unsigned long pt_size;
 	bool pt_per_process;
@@ -229,7 +235,7 @@ int kgsl_mmu_unmap(struct kgsl_pagetable *pagetable,
 int kgsl_mmu_put_gpuaddr(struct kgsl_pagetable *pagetable,
 		 struct kgsl_memdesc *memdesc);
 unsigned int kgsl_virtaddr_to_physaddr(void *virtaddr);
-void kgsl_setstate(struct kgsl_mmu *mmu, unsigned int context_id,
+int kgsl_setstate(struct kgsl_mmu *mmu, unsigned int context_id,
 			uint32_t flags);
 int kgsl_mmu_get_ptname_from_ptbase(struct kgsl_mmu *mmu,
 					phys_addr_t pt_base);
@@ -258,19 +264,23 @@ static inline phys_addr_t kgsl_mmu_get_current_ptbase(struct kgsl_mmu *mmu)
 		return 0;
 }
 
-static inline void kgsl_mmu_setstate(struct kgsl_mmu *mmu,
+static inline int kgsl_mmu_setstate(struct kgsl_mmu *mmu,
 			struct kgsl_pagetable *pagetable,
 			unsigned int context_id)
 {
 	if (mmu->mmu_ops && mmu->mmu_ops->mmu_setstate)
-		mmu->mmu_ops->mmu_setstate(mmu, pagetable, context_id);
+		return mmu->mmu_ops->mmu_setstate(mmu, pagetable, context_id);
+
+	return 0;
 }
 
-static inline void kgsl_mmu_device_setstate(struct kgsl_mmu *mmu,
+static inline int kgsl_mmu_device_setstate(struct kgsl_mmu *mmu,
 						uint32_t flags)
 {
 	if (mmu->mmu_ops && mmu->mmu_ops->mmu_device_setstate)
-		mmu->mmu_ops->mmu_device_setstate(mmu, flags);
+		return mmu->mmu_ops->mmu_device_setstate(mmu, flags);
+
+	return 0;
 }
 
 static inline void kgsl_mmu_stop(struct kgsl_mmu *mmu)
@@ -318,11 +328,18 @@ static inline int kgsl_mmu_enable_clk(struct kgsl_mmu *mmu,
 		return 0;
 }
 
+static inline void kgsl_mmu_disable_clk(struct kgsl_mmu *mmu, int ctx_id)
+{
+	if (mmu->mmu_ops && mmu->mmu_ops->mmu_disable_clk)
+		mmu->mmu_ops->mmu_disable_clk(mmu, ctx_id);
+}
+
 static inline void kgsl_mmu_disable_clk_on_ts(struct kgsl_mmu *mmu,
-						unsigned int ts, bool ts_valid)
+						unsigned int ts,
+						int ctx_id)
 {
 	if (mmu->mmu_ops && mmu->mmu_ops->mmu_disable_clk_on_ts)
-		mmu->mmu_ops->mmu_disable_clk_on_ts(mmu, ts, ts_valid);
+		mmu->mmu_ops->mmu_disable_clk_on_ts(mmu, ts, ctx_id);
 }
 
 static inline unsigned int kgsl_mmu_get_int_mask(void)
@@ -459,6 +476,15 @@ static inline int kgsl_mmu_sync_unlock(struct kgsl_mmu *mmu,
 	if ((mmu->flags & KGSL_MMU_FLAGS_IOMMU_SYNC) &&
 		mmu->mmu_ops && mmu->mmu_ops->mmu_sync_unlock)
 		return mmu->mmu_ops->mmu_sync_unlock(mmu, cmds);
+	else
+		return 0;
+}
+
+static inline int kgsl_mmu_set_pagefault_policy(struct kgsl_mmu *mmu,
+						unsigned int pf_policy)
+{
+	if (mmu->mmu_ops && mmu->mmu_ops->mmu_set_pf_policy)
+		return mmu->mmu_ops->mmu_set_pf_policy(mmu, pf_policy);
 	else
 		return 0;
 }

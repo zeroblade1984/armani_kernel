@@ -5,9 +5,18 @@
 **
 ** Description:
 **     Output data handler module for TSP 3000 Edition.
-**     ‘This module supports only one actuator and one sample per update.
+**     This module supports only one actuator and one sample per update.
 **
-** Copyright (C) 2014 XiaoMi, Inc.
+** Portions Copyright (C) 2015 XiaoMi, Inc. All Rights Reserved.
+** Portions Copyright (c) 2011-2012 Immersion Corporation. All Rights Reserved.
+**
+** This file contains Original Code and/or Modifications of Original Code
+** as defined in and that are subject to the GNU Public License v2 -
+** (the 'License'). You may not use this file except in compliance with the
+** License. You should have received a copy of the GNU General Public License
+** along with this program; if not, write to the Free Software Foundation, Inc.,
+** 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA or contact
+** TouchSenseSales@immersion.com.
 **
 ** The Original Code and all software distributed under the License are
 ** distributed on an 'AS IS' basis, WITHOUT WARRANTY OF ANY KIND, EITHER

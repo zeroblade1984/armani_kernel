@@ -1,6 +1,8 @@
 /*
 ** =========================================================================
-** Copyright (C) 2014 XiaoMi, Inc.
+** Copyright (c) 2007-2013  Immersion Corporation.  All rights reserved.
+**                          Immersion Corporation Confidential and Proprietary
+** Copyright (C) 2015 XiaoMi, Inc.  All rights reserved.
 **
 ** File:
 **     ImmVibeSPI.c
@@ -40,7 +42,7 @@
 #include <linux/slab.h>
 #include <linux/hrtimer.h>
 #include "../../staging/android/timed_output.h"
-
+#include <linux/regulator/consumer.h>
 
 /*
 ** GPIO to ISA1000_EN pin
@@ -83,14 +85,13 @@ static struct isa1000_vib *vib_dev;
 static int isa1000_vib_set(struct isa1000_vib *vib, int on)
 {
 	int rc;
-	int period_us = pwm_period_ns/1000;
 
 	if (on) {
 		rc = pwm_config(pwm,
-						(period_us * pwm_duty) / 100,
-						period_us);
+						(pwm_period_ns * pwm_duty) / 100,
+						pwm_period_ns);
 		if (rc < 0){
-			printk( "Unable to config pwm\n");
+			printk( "Unable to config pwm%d\n",rc);
 		}
 
 		rc = pwm_enable(pwm);
@@ -165,7 +166,6 @@ static enum hrtimer_restart isa1000_vib_timer_func(struct hrtimer *timer)
 static void isa1000_vib_set_level(int level)
 {
         int rc = 0;
-        int period_us = pwm_period_ns / 1000;
 
         if  (level != 0) {
 
@@ -174,8 +174,8 @@ static void isa1000_vib_set_level(int level)
                 **              Please modify for PWM on Hong Mi 2A platform
                 */
                 rc = pwm_config(pwm,
-                                (period_us * (level + 128)) / 256,
-                                period_us);
+                                (pwm_period_ns * (level + 128)) / 256,
+                                pwm_period_ns);
                 if (rc < 0) {
                         pr_err("%s: pwm_config fail\n", __func__);
                         goto chip_dwn;
@@ -240,6 +240,7 @@ static DEVICE_ATTR(amp, S_IRUGO | S_IWUSR, vibrator_amp_show, vibrator_amp_store
 static int isa1000_setup(void)
 {
         int ret;
+	struct regulator *vdd_regulator;
 
         ret = gpio_is_valid(GPIO_ISA1000_EN);
         if (ret) {
@@ -277,6 +278,16 @@ static int isa1000_setup(void)
             return PTR_ERR(pwm);
         }
 
+	vdd_regulator = regulator_get(NULL,"8226_l28");
+	if (IS_ERR(vdd_regulator)) {
+		printk(KERN_ERR "%s:fail to get vdd l28\n",__func__);
+		return PTR_ERR(vdd_regulator);
+	}
+	ret = regulator_enable(vdd_regulator);
+	if (ret) {
+		printk(KERN_ERR "Regulator vdd enable failed rc=%d\n", ret);
+		return ret;
+	}
         printk(KERN_INFO "%s: %s set up\n", __func__, "isa1000");
         return 0;
 }

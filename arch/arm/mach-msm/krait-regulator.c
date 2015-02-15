@@ -222,6 +222,7 @@ struct krait_power_vreg {
 	int				ldo_threshold_uV;
 	int				ldo_delta_uV;
 	int				cpu_num;
+	bool				ldo_disable;
 	int				coeff1;
 	int				coeff2;
 	bool				reg_en;
@@ -656,6 +657,9 @@ static void __switch_to_using_ldo(void *info)
 {
 	struct krait_power_vreg *kvreg = info;
 
+	if (kvreg->ldo_disable)
+		return;
+
 	/*
 	 * if the krait is in ldo mode and a voltage change is requested on the
 	 * ldo switch to using hs before changing ldo voltage
@@ -1052,6 +1056,7 @@ static int krait_regulator_cpu_callback(struct notifier_block *nfb,
 			(int)action, cpu, cpu_online(cpu));
 	switch (action & ~CPU_TASKS_FROZEN) {
 	case CPU_UP_PREPARE:
+	case CPU_UP_CANCELED:
 		mutex_lock(&pvreg->krait_power_vregs_lock);
 		kvreg->force_bhs = true;
 		/*
@@ -1062,7 +1067,6 @@ static int krait_regulator_cpu_callback(struct notifier_block *nfb,
 		__switch_to_using_bhs(kvreg);
 		mutex_unlock(&pvreg->krait_power_vregs_lock);
 		break;
-	case CPU_UP_CANCELED:
 	case CPU_ONLINE:
 		mutex_lock(&pvreg->krait_power_vregs_lock);
 		kvreg->force_bhs = false;
@@ -1173,6 +1177,9 @@ static void online_at_probe(struct krait_power_vreg *kvreg)
 			& readl_relaxed(kvreg->reg_base + CPU_PWR_CTL);
 	kvreg->online_at_probe
 		= online ? (WAIT_FOR_LOAD | WAIT_FOR_VOLTAGE) : 0x0;
+
+	if (online)
+		kvreg->force_bhs = false;
 }
 
 static void glb_init(void __iomem *apcs_gcc_base)
@@ -1197,6 +1204,7 @@ static int __devinit krait_power_probe(struct platform_device *pdev)
 	int headroom_uV, retention_uV, ldo_default_uV, ldo_threshold_uV;
 	int ldo_delta_uV;
 	int cpu_num;
+	bool ldo_disable = false;
 
 	if (pdev->dev.of_node) {
 		/* Get init_data from device tree. */
@@ -1280,6 +1288,9 @@ static int __devinit krait_power_probe(struct platform_device *pdev)
 			pr_err("bad cpu-num= %d specified\n", cpu_num);
 			return -EINVAL;
 		}
+
+		ldo_disable = of_property_read_bool(pdev->dev.of_node,
+					"qcom,ldo-disable");
 	}
 
 	if (!init_data) {
@@ -1333,6 +1344,8 @@ static int __devinit krait_power_probe(struct platform_device *pdev)
 	kvreg->ldo_threshold_uV = ldo_threshold_uV;
 	kvreg->ldo_delta_uV	= ldo_delta_uV;
 	kvreg->cpu_num		= cpu_num;
+	kvreg->ldo_disable	= ldo_disable;
+	kvreg->force_bhs	= true;
 
 	platform_set_drvdata(pdev, kvreg);
 
@@ -1430,11 +1443,17 @@ static int __devinit krait_pdn_phase_scaling_init(struct pmic_gang_vreg *pvreg,
 {
 	struct resource *res;
 	void __iomem *efuse;
-	u32 efuse_data, efuse_version;
-	bool scaling_factor_valid, use_efuse;
+	u32 efuse_data, efuse_version, efuse_version_data;
+	bool sf_valid, use_efuse;
+	int sf_pos, sf_mask;
+	struct device_node *node = pdev->dev.of_node;
+	struct device *dev = &pdev->dev;
+	int valid_sfs[4] = {0, 0, 0, 0};
+	int sf_versions_len;
+	int rc;
 
-	use_efuse = of_property_read_bool(pdev->dev.of_node,
-					  "qcom,use-phase-scaling-factor");
+	use_efuse = of_property_read_bool(node,
+				"qcom,use-phase-scaling-factor");
 	/*
 	 * Allow usage of the eFuse phase scaling factor if it is enabled in
 	 * either device tree or by module parameter.
@@ -1449,6 +1468,7 @@ static int __devinit krait_pdn_phase_scaling_init(struct pmic_gang_vreg *pvreg,
 		return -EINVAL;
 	}
 
+	/* Read efuse registers */
 	efuse = ioremap(res->start, 8);
 	if (!efuse) {
 		pr_err("could not map phase scaling eFuse address\n");
@@ -1456,25 +1476,47 @@ static int __devinit krait_pdn_phase_scaling_init(struct pmic_gang_vreg *pvreg,
 	}
 
 	efuse_data = readl_relaxed(efuse);
-	efuse_version = readl_relaxed(efuse + 4);
-
+	efuse_version_data = readl_relaxed(efuse + 4);
 	iounmap(efuse);
 
-	scaling_factor_valid
-		= ((efuse_version & PHASE_SCALING_EFUSE_VERSION_MASK) >>
-				PHASE_SCALING_EFUSE_VERSION_POS)
-			== PHASE_SCALING_EFUSE_VERSION_SET;
+	rc = of_property_read_u32(pdev->dev.of_node,
+					"qcom,phase-scaling-factor-bits-pos",
+					&sf_pos);
+	if (rc < 0) {
+		dev_err(dev, "qcom,phase-scaling-factor-bits-pos missing rc=%d\n",
+									rc);
+		return -EINVAL;
+	}
 
-	if (scaling_factor_valid)
+	sf_mask = KRAIT_MASK(sf_pos + 2, sf_pos);
+
+	efuse_version
+		= ((efuse_version_data & PHASE_SCALING_EFUSE_VERSION_MASK) >>
+				PHASE_SCALING_EFUSE_VERSION_POS);
+
+	if (of_find_property(node, "qcom,valid-scaling-factor-versions",
+				&sf_versions_len)
+		&& (sf_versions_len == 4 * sizeof(u32))) {
+		rc = of_property_read_u32_array(node,
+				"qcom,valid-scaling-factor-versions",
+				valid_sfs, 4);
+		sf_valid = (valid_sfs[efuse_version] == 1);
+	} else {
+		dev_err(dev, "qcom,valid-scaling-factor-versions missing or its size is incorrect rc=%d\n",
+									rc);
+		return -EINVAL;
+	}
+
+	if (sf_valid)
 		pvreg->efuse_phase_scaling_factor
-			= ((efuse_data & PHASE_SCALING_EFUSE_VALUE_MASK)
-				>> PHASE_SCALING_EFUSE_VALUE_POS) + 1;
+			= ((efuse_data & sf_mask)
+				>> sf_pos) + 1;
 	else
 		pvreg->efuse_phase_scaling_factor = PHASE_SCALING_REF;
 
 	pr_info("eFuse phase scaling factor = %d/%d%s\n",
 		pvreg->efuse_phase_scaling_factor, PHASE_SCALING_REF,
-		scaling_factor_valid ? "" : " (eFuse not blown)");
+		sf_valid ? "" : " (eFuse not blown)");
 	pr_info("initial phase scaling factor = %d/%d%s\n",
 		use_efuse_phase_scaling_factor
 			? pvreg->efuse_phase_scaling_factor : PHASE_SCALING_REF,
@@ -1623,6 +1665,12 @@ void secondary_cpu_hs_init(void *base_ptr, int cpu)
 	void *mdd_base;
 	struct krait_power_vreg *kvreg;
 
+	if (version == 0) {
+		gcc_base_ptr = ioremap_nocache(GCC_BASE, SZ_4K);
+		version = readl_relaxed(gcc_base_ptr + VERSION);
+		iounmap(gcc_base_ptr);
+	}
+
 	/* Turn on the BHS, turn off LDO Bypass and power down LDO */
 	reg_val =  BHS_CNT_DEFAULT << BHS_CNT_BIT_POS
 		| LDO_PWR_DWN_MASK
@@ -1630,23 +1678,14 @@ void secondary_cpu_hs_init(void *base_ptr, int cpu)
 		| BHS_EN_MASK;
 	writel_relaxed(reg_val, base_ptr + APC_PWR_GATE_CTL);
 
-	if (version == 0) {
-		gcc_base_ptr = ioremap_nocache(GCC_BASE, SZ_4K);
-		version = readl_relaxed(gcc_base_ptr + VERSION);
-		iounmap(gcc_base_ptr);
-	}
+	/* complete the above write before the delay */
+	mb();
+	/* wait for the bhs to settle */
+	udelay(BHS_SETTLING_DELAY_US);
 
-	/* Turn on the BHS segments only for version < 2 */
-	if (version <= KPSS_VERSION_2P0) {
-		/* complete the above write before the delay */
-		mb();
-		/* wait for the bhs to settle */
-		udelay(BHS_SETTLING_DELAY_US);
-
-		/* Turn on BHS segments */
-		reg_val |= BHS_SEG_EN_DEFAULT << BHS_SEG_EN_BIT_POS;
-		writel_relaxed(reg_val, base_ptr + APC_PWR_GATE_CTL);
-	}
+	/* Turn on BHS segments */
+	reg_val |= BHS_SEG_EN_DEFAULT << BHS_SEG_EN_BIT_POS;
+	writel_relaxed(reg_val, base_ptr + APC_PWR_GATE_CTL);
 
 	/* complete the above write before the delay */
 	mb();

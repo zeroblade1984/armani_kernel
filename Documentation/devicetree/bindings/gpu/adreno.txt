@@ -64,12 +64,19 @@ DCVS Core info
 Optional Properties:
 - qcom,initial-powerlevel: This value indicates which qcom,gpu-pwrlevel should be used at start time
 			   and when coming back out of resume
-- qcom,step-pwrlevel:	   How many qcom,gpu-pwrlevel should be decremented at once
+- qcom,bus-control:	   Boolean. Enables an independent bus vote from the gpu frequency
 - qcom,idle-timeout:	   This property represents the time in microseconds for idle timeout.
 - qcom,chipid:		   If it exists this property is used to replace
 			   the chip identification read from the GPU hardware.
 			   This is used to override faulty hardware readings.
 - qcom,strtstp-sleepwake:  Boolean. Enables use of GPU SLUMBER instead of SLEEP for power savings
+
+- qcom,pm-qos-latency:		Every time GPU wakes up from sleep, driver votes for
+				acceptable maximum latency to the pm-qos driver. This
+				voting demands that *CPU* can not go into a power save
+				state *if* the latency to bring CPU back into normal
+				state is more than this value.
+				Value is in microseconds.
 
 The following properties are optional as collecting data via coresight might
 not be supported for every chipset. The documentation for coresight

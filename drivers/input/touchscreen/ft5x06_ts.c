@@ -2137,9 +2137,11 @@ struct ft5x06_data *ft5x06_probe(struct device *dev,
 
 #if defined(CONFIG_FB)
 	ft5x06->fb_notif.notifier_call = fb_notifier_callback;
-	error = fb_register_client(&ft5x06->fb_notif);
-	if (error)
-		dev_err(dev, "Unable to register fb_notifier: %d\n",
+
+	 error = fb_register_client(&ft5x06->fb_notif);
+
+	 if (error)
+		 dev_err(dev, "Unable to register fb_notifier: %d\n",
 			 error);
 #elif defined(CONFIG_HAS_EARLYSUSPEND)
 	ft5x06->early_suspend.level   = EARLY_SUSPEND_LEVEL_BLANK_SCREEN+1;

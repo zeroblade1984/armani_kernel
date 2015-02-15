@@ -154,6 +154,7 @@ typedef enum
  */
 #define IS_MCC_SUPPORTED (WDA_IsWcnssWlanReportedVersionGreaterThanOrEqual( 0, 1, 1, 0))
 #define IS_FEATURE_SUPPORTED_BY_FW(featEnumValue) (!!WDA_getFwWlanFeatCaps(featEnumValue))
+#define IS_FEATURE_SUPPORTED_BY_DRIVER(featEnumValue) (!!WDA_getHostWlanFeatCaps(featEnumValue))
 
 #ifdef WLAN_ACTIVEMODE_OFFLOAD_FEATURE
 #define IS_ACTIVEMODE_OFFLOAD_FEATURE_ENABLE ((WDA_getFwWlanFeatCaps(WLANACTIVE_OFFLOAD)) & (WDI_getHostWlanFeatCaps(WLANACTIVE_OFFLOAD)))
@@ -170,65 +171,11 @@ typedef enum
 /* Check if heartbeat offload is enabled */
 #define IS_IBSS_HEARTBEAT_OFFLOAD_FEATURE_ENABLE ((WDI_getHostWlanFeatCaps(IBSS_HEARTBEAT_OFFLOAD)) & (WDA_getFwWlanFeatCaps(IBSS_HEARTBEAT_OFFLOAD)))
 
-typedef enum {
-    MODE_11A        = 0,   /* 11a Mode */
-    MODE_11G        = 1,   /* 11b/g Mode */
-    MODE_11B        = 2,   /* 11b Mode */
-    MODE_11GONLY    = 3,   /* 11g only Mode */
-    MODE_11NA_HT20   = 4,  /* 11a HT20 mode */
-    MODE_11NG_HT20   = 5,  /* 11g HT20 mode */
-    MODE_11NA_HT40   = 6,  /* 11a HT40 mode */
-    MODE_11NG_HT40   = 7,  /* 11g HT40 mode */
-    MODE_11AC_VHT20 = 8,
-    MODE_11AC_VHT40 = 9,
-    MODE_11AC_VHT80 = 10,
-//    MODE_11AC_VHT160 = 11,
-    MODE_11AC_VHT20_2G = 11,
-    MODE_11AC_VHT40_2G = 12,
-    MODE_11AC_VHT80_2G = 13,
-    MODE_UNKNOWN    = 14,
-    MODE_MAX        = 14
-} WLAN_PHY_MODE;
-
-#define WLAN_HAL_CHAN_FLAG_HT40_PLUS   6
-#define WLAN_HAL_CHAN_FLAG_PASSIVE     7
-#define WLAN_HAL_CHAN_ADHOC_ALLOWED    8
-#define WLAN_HAL_CHAN_AP_DISABLED      9
-#define WLAN_HAL_CHAN_FLAG_DFS         10
-#define WLAN_HAL_CHAN_FLAG_ALLOW_HT    11  /* HT is allowed on this channel */
-#define WLAN_HAL_CHAN_FLAG_ALLOW_VHT   12  /* VHT is allowed on this channel */
-
-#define WDA_SET_CHANNEL_FLAG(pwda_channel,flag) do { \
-        (pwda_channel)->channel_info |=  (1 << flag);      \
-     } while(0)
-
-#define WDA_SET_CHANNEL_MODE(pwda_channel,val) do { \
-     (pwda_channel)->channel_info &= 0xffffffc0;            \
-     (pwda_channel)->channel_info |= (val);                 \
-     } while(0)
-
-#define WDA_SET_CHANNEL_MAX_POWER(pwda_channel,val) do { \
-     (pwda_channel)->reg_info_1 &= 0xffff00ff;           \
-     (pwda_channel)->reg_info_1 |= ((val&0xff) << 8);    \
-     } while(0)
-
-#define WDA_SET_CHANNEL_REG_POWER(pwda_channel,val) do { \
-     (pwda_channel)->reg_info_1 &= 0xff00ffff;           \
-     (pwda_channel)->reg_info_1 |= ((val&0xff) << 16);   \
-     } while(0)
-#define WDA_SET_CHANNEL_MIN_POWER(pwlan_hal_update_channel,val) do { \
-     (pwlan_hal_update_channel)->reg_info_1 &= 0xffffff00;           \
-     (pwlan_hal_update_channel)->reg_info_1 |= (val&0xff);           \
-     } while(0)
-#define WDA_SET_CHANNEL_ANTENNA_MAX(pwlan_hal_update_channel,val) do { \
-     (pwlan_hal_update_channel)->reg_info_2 &= 0xffffff00;             \
-     (pwlan_hal_update_channel)->reg_info_2 |= (val&0xff);             \
-     } while(0)
-#define WDA_SET_CHANNEL_REG_CLASSID(pwlan_hal_update_channel,val) do { \
-     (pwlan_hal_update_channel)->reg_info_1 &= 0x00ffffff;             \
-     (pwlan_hal_update_channel)->reg_info_1 |= ((val&0xff) << 24);     \
-     } while(0)
-
+#ifdef FEATURE_WLAN_TDLS
+#define IS_ADVANCE_TDLS_ENABLE ((WDI_getHostWlanFeatCaps(ADVANCE_TDLS)) & (WDA_getFwWlanFeatCaps(ADVANCE_TDLS)))
+#else
+#define IS_ADVANCE_TDLS_ENABLE 0
+#endif
 /*--------------------------------------------------------------------------
   Definitions for Data path APIs
  --------------------------------------------------------------------------*/
@@ -1160,6 +1107,13 @@ tSirRetStatus uMacPostCtrlMsg(void* pSirGlobal, tSirMbMsg* pMb);
 #define WDA_ADD_PERIODIC_TX_PTRN_IND    SIR_HAL_ADD_PERIODIC_TX_PTRN_IND
 #define WDA_DEL_PERIODIC_TX_PTRN_IND    SIR_HAL_DEL_PERIODIC_TX_PTRN_IND
 
+#ifdef FEATURE_WLAN_BATCH_SCAN
+#define WDA_SET_BATCH_SCAN_REQ            SIR_HAL_SET_BATCH_SCAN_REQ
+#define WDA_SET_BATCH_SCAN_RSP            SIR_HAL_SET_BATCH_SCAN_RSP
+#define WDA_STOP_BATCH_SCAN_IND           SIR_HAL_STOP_BATCH_SCAN_IND
+#define WDA_TRIGGER_BATCH_SCAN_RESULT_IND SIR_HAL_TRIGGER_BATCH_SCAN_RESULT_IND
+#endif
+
 tSirRetStatus wdaPostCtrlMsg(tpAniSirGlobal pMac, tSirMsgQ *pMsg);
 
 eHalStatus WDA_SetRegDomain(void * clientCtxt, v_REGDOMAIN_t regId,
@@ -1199,8 +1153,6 @@ eHalStatus WDA_SetRegDomain(void * clientCtxt, v_REGDOMAIN_t regId,
 
 v_BOOL_t WDA_IsHwFrameTxTranslationCapable(v_PVOID_t pVosGCtx, 
                                                       tANI_U8 staIdx);
-
-v_BOOL_t WDA_IsSelfSTA(v_PVOID_t pVosGCtx,tANI_U8 staIdx);
 
 #  define WDA_EnableUapsdAcParams(vosGCtx, staId, uapsdInfo) \
          WDA_SetUapsdAcParamsReq(vosGCtx, staId, uapsdInfo)

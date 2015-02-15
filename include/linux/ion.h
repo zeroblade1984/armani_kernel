@@ -22,6 +22,8 @@
 #include <linux/types.h>
 
 struct ion_handle;
+typedef struct ion_handle *ion_user_handle_t;
+
 /**
  * enum ion_heap_types - list of all possible types of heaps
  * @ION_HEAP_TYPE_SYSTEM:	 memory allocated via vmalloc
@@ -58,6 +60,14 @@ enum ion_heap_type {
 #define ION_FLAG_CACHED_NEEDS_SYNC 2	/* mappings of this buffer will created
 					   at mmap time, if this is set
 					   caches must be managed manually */
+#define ION_FLAG_FREED_FROM_SHRINKER 4	/* Skip any possible
+					   heap-specific caching
+					   mechanism (e.g. page
+					   pools). Guarantees that any
+					   buffer storage that came
+					   from the system allocator
+					   will be returned to the
+					   system allocator. */
 
 #ifdef __KERNEL__
 #include <linux/err.h>
@@ -342,7 +352,7 @@ struct ion_allocation_data {
 	size_t align;
 	unsigned int heap_mask;
 	unsigned int flags;
-	struct ion_handle *handle;
+	ion_user_handle_t handle;
 };
 
 /**
@@ -356,7 +366,7 @@ struct ion_allocation_data {
  * provides the file descriptor and the kernel returns the handle.
  */
 struct ion_fd_data {
-	struct ion_handle *handle;
+	ion_user_handle_t handle;
 	int fd;
 };
 
@@ -365,7 +375,7 @@ struct ion_fd_data {
  * @handle:	a handle
  */
 struct ion_handle_data {
-	struct ion_handle *handle;
+	ion_user_handle_t handle;
 };
 
 /**

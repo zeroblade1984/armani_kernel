@@ -1,4 +1,4 @@
-/* Copyright (c) 2008-2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2008-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -981,7 +981,7 @@ long diagchar_ioctl(struct file *filp,
 			clear_client_dci_cumulative_log_mask(i);
 			/* send updated log mask to peripherals */
 			result =
-			diag_send_dci_log_mask(driver->smd_cntl[MODEM_DATA].ch);
+			diag_send_dci_log_mask(&driver->smd_cntl[MODEM_DATA]);
 			if (result != DIAG_DCI_NO_ERROR) {
 				mutex_unlock(&driver->dci_mutex);
 				return result;
@@ -991,7 +991,7 @@ long diagchar_ioctl(struct file *filp,
 			/* send updated event mask to peripherals */
 			result =
 			diag_send_dci_event_mask(
-				driver->smd_cntl[MODEM_DATA].ch);
+				&driver->smd_cntl[MODEM_DATA]);
 			if (result != DIAG_DCI_NO_ERROR) {
 				mutex_unlock(&driver->dci_mutex);
 				return result;
@@ -1120,7 +1120,7 @@ long diagchar_ioctl(struct file *filp,
 	case DIAG_IOCTL_VOTE_REAL_TIME:
 		if (copy_from_user(&rt_vote, (void *)ioarg, sizeof(struct
 							real_time_vote_t)))
-			result = -EFAULT;
+			return -EFAULT;
 		driver->real_time_update_busy++;
 		if (rt_vote.proc == DIAG_PROC_DCI) {
 			diag_dci_set_real_time(current->tgid,
@@ -1168,7 +1168,6 @@ static int diagchar_read(struct file *file, char __user *buf, size_t count,
 	int remote_token;
 	int exit_stat;
 	int clear_read_wakelock;
-	unsigned long flags;
 
 	for (i = 0; i < driver->num_clients; i++)
 		if (driver->client_map[i].pid == current->tgid)
@@ -1250,10 +1249,7 @@ drop:
 					process_lock_on_copy(&data->nrt_lock);
 					clear_read_wakelock++;
 				}
-				spin_lock_irqsave(&data->in_busy_lock, flags);
 				data->in_busy_1 = 0;
-				spin_unlock_irqrestore(&data->in_busy_lock,
-						       flags);
 			}
 			if (data->in_busy_2 == 1) {
 				num_data++;
@@ -1268,10 +1264,7 @@ drop:
 					process_lock_on_copy(&data->nrt_lock);
 					clear_read_wakelock++;
 				}
-				spin_lock_irqsave(&data->in_busy_lock, flags);
 				data->in_busy_2 = 0;
-				spin_unlock_irqrestore(&data->in_busy_lock,
-						       flags);
 			}
 		}
 		if (driver->supports_separate_cmdrsp) {

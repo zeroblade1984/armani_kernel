@@ -577,13 +577,6 @@ config HAPTIC_ISA1200
 	help
 	  The ISA1200 is a high performance enhanced haptic driver.
 
-config ISA1000_VIBRATOR
-       tristate "Vibrator support "
-       depends on OF_SPMI
-       default n
-       help
-        This option enables device driver support for the vibrator
-
 config PMIC8058_PWM
 	tristate "Qualcomm PM8058 PWM support"
 	depends on PMIC8058
@@ -671,13 +664,13 @@ config TI_DRV2667
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called ti_drv2667.
-
+	  
 config IMMERSION_HAPTIC
 	tristate "Immersion haptic controller support"
-        depends on I2C
-        help
+	depends on I2C
+	default n
+	help
 	  The driver support immersion haptic controller.
-
 
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"

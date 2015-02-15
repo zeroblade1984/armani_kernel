@@ -1,9 +1,14 @@
-/* Copyright (c) 2013, LGE Inc. All rights reserved.
- * Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+/*
+ * arch/arm/mach-msm/kcal_ctrl.c
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 and
- * only version 2 as published by the Free Software Foundation.
+ * Copyright (c) 2013, LGE Inc. All rights reserved
+ * Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2014 Paul Reioux <reioux@gmail.com>
+ * Copyright (c) 2014 Alex Deddo <adeddo27@gmail.com>
+ *
+ * This software is licensed under the terms of the GNU General Public
+ * License version 2, as published by the Free Software Foundation, and
+ * may be copied, distributed, and modified under those terms.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -16,9 +21,9 @@
 #include <linux/platform_device.h>
 #include <linux/init.h>
 #include <linux/module.h>
-#include <mach/xiaomi_kcal.h>
+#include <mach/kcal.h>
 
-#if defined(CONFIG_LCD_KCAL)
+#ifdef CONFIG_LCD_KCAL
 
 static struct kcal_platform_data *kcal_pdata;
 static int last_status_kcal_ctrl;
@@ -84,8 +89,31 @@ static ssize_t kcal_ctrl_show(struct device *dev,
 		return sprintf(buf, "OK\n");
 }
 
+static ssize_t kcal_min_store(struct device *dev, struct device_attribute *attr,
+						const char *buf, size_t count)
+{
+	int kcal_min = 0;
+
+	if (!count)
+		return -EINVAL;
+
+	sscanf(buf, "%d", &kcal_min);
+	kcal_pdata->set_min(kcal_min);
+	return count;
+}
+
+static ssize_t kcal_min_show(struct device *dev, struct device_attribute *attr,
+								char *buf)
+{
+	int kcal_min = 0;
+
+	kcal_pdata->get_min(&kcal_min);
+	return sprintf(buf, "%d\n", kcal_min);
+}
+
 static DEVICE_ATTR(kcal, 0644, kcal_show, kcal_store);
 static DEVICE_ATTR(kcal_ctrl, 0644, kcal_ctrl_show, kcal_ctrl_store);
+static DEVICE_ATTR(kcal_min, 0644, kcal_min_show, kcal_min_store);
 
 static int kcal_ctrl_probe(struct platform_device *pdev)
 {
@@ -102,6 +130,9 @@ static int kcal_ctrl_probe(struct platform_device *pdev)
 	if(rc !=0)
 		return -1;
 	rc = device_create_file(&pdev->dev, &dev_attr_kcal_ctrl);
+	if(rc !=0)
+		return -1;
+	rc = device_create_file(&pdev->dev, &dev_attr_kcal_min);
 	if(rc !=0)
 		return -1;
 

@@ -148,7 +148,7 @@ static int panic_wdog_handler(struct notifier_block *this,
 				wdog_dd->base + WDT0_BITE_TIME);
 		__raw_writel(1, wdog_dd->base + WDT0_RST);
 	}
-
+	
 	/* Suspend wdog until all stacks are printed */
 	if (enable) {
 		__raw_writel(1, wdog_dd->base + WDT0_RST);
@@ -164,7 +164,7 @@ static int panic_wdog_handler(struct notifier_block *this,
 		__raw_writel(1, wdog_dd->base + WDT0_RST);
 		mb();
 	}
-
+	
 	return NOTIFY_DONE;
 }
 
@@ -367,8 +367,8 @@ static irqreturn_t wdog_bark_handler(int irq, void *dev_id)
 	if (wdog_dd->do_ipi_ping)
 		dump_cpu_alive_mask(wdog_dd);
 	printk(KERN_INFO "Causing a watchdog bite!");
-
-        if (enable) {
+	
+	    if (enable) {
                 __raw_writel(1, wdog_dd->base + WDT0_RST);
                 __raw_writel(0, wdog_dd->base + WDT0_EN);
                 mb();

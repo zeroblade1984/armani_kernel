@@ -216,7 +216,7 @@ static void vos_pkti_replenish_raw_pool(void)
       pSkb = alloc_skb(VPKT_SIZE_BUFFER, GFP_ATOMIC);
       if (unlikely(NULL == pSkb))
       {
-         gpVosPacketContext->rxReplenishFailCount++;
+         // we have replenished all that we can
          break;
       }
       skb_reserve(pSkb, VPKT_SIZE_BUFFER);
@@ -718,7 +718,7 @@ VOS_STATUS vos_pkt_get_packet( vos_pkt_t **ppPacket,
    // then we know we are already in a low-resource condition
    if (unlikely(pLowResourceInfo->callback))
    {
-      VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+      VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_WARN,
                 "VPKT [%d]: Low resource handler already registered",
                 __LINE__);
       return VOS_STATUS_E_ALREADY;
@@ -912,7 +912,7 @@ VOS_STATUS vos_pkt_wrap_data_packet( vos_pkt_t **ppPacket,
    // then we know we are already in a low-resource condition
    if (unlikely(pLowResourceInfo->callback))
    {
-      VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_ERROR,
+      VOS_TRACE(VOS_MODULE_ID_VOSS, VOS_TRACE_LEVEL_WARN,
                 "VPKT [%d]: Low resource handler already registered",
                 __LINE__);
       mutex_unlock(mlock);
@@ -1301,7 +1301,7 @@ VOS_STATUS vos_pkt_return_packet( vos_pkt_t *pPacket )
    vos_pkt_get_packet_callback callback;
    v_SIZE_t *pCount;
    VOS_PKT_TYPE packetType = VOS_PKT_TYPE_TX_802_3_DATA;
-   v_BOOL_t lowResource;
+   v_BOOL_t lowResource = VOS_FALSE;
    struct mutex * mlock;
 
    // Validate the input parameter pointer
@@ -1317,7 +1317,6 @@ VOS_STATUS vos_pkt_return_packet( vos_pkt_t *pPacket )
       pNext = pPacket->pNext;
       pPacket->pNext = NULL;
 
-      lowResource = VOS_FALSE;
       // Validate that this really an initialized vos packet
       if (unlikely(VPKT_MAGIC_NUMBER != pPacket->magic))
       {

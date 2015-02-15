@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1082,20 +1082,23 @@ int32_t msm_sensor_power_up(struct msm_sensor_ctrl_t *s_ctrl)
 			goto power_up_failed;
 		}
 	}
-	for (retry = 0; retry < 3; retry++) {
+
+	for (retry = 0; retry < 3; retry++)
+	{
 		if (s_ctrl->func_tbl->sensor_match_id)
 			rc = s_ctrl->func_tbl->sensor_match_id(s_ctrl);
 		else
 			rc = msm_sensor_match_id(s_ctrl);
 		if (rc < 0) {
-			if (retry < 2)
+			if (retry < 2) {
 				continue;
-			else {
+			} else {
 				pr_err("%s:%d match id failed rc %d\n", __func__, __LINE__, rc);
 				goto power_up_failed;
 			}
-		} else
+		} else {
 			break;
+		}
 	}
 
 	CDBG("%s exit\n", __func__);

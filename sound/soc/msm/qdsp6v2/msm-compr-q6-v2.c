@@ -52,6 +52,9 @@
 #define COMPRESSED_LR_VOL_MAX_STEPS	0x20002000
 
 #define MAX_AC3_PARAM_SIZE		(18*2*sizeof(int))
+#define AMR_WB_BAND_MODE 8
+#define AMR_WB_DTX_MODE 0
+
 
 const DECLARE_TLV_DB_LINEAR(compr_rx_vol_gain, 0,
 			    COMPRESSED_LR_VOL_MAX_STEPS);
@@ -108,11 +111,29 @@ static unsigned int supported_sample_rates[] = {
 	8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000
 };
 
+/* Add supported codecs for compress capture path */
+static uint32_t supported_compr_capture_codecs[] = {
+	SND_AUDIOCODEC_AMRWB
+};
+
 static struct snd_pcm_hw_constraint_list constraints_sample_rates = {
 	.count = ARRAY_SIZE(supported_sample_rates),
 	.list = supported_sample_rates,
 	.mask = 0,
 };
+
+static bool msm_compr_capture_codecs(uint32_t req_codec)
+{
+	int i;
+	pr_debug("%s req_codec:%d\n", __func__, req_codec);
+	if (req_codec == 0)
+		return false;
+	for (i = 0; i < ARRAY_SIZE(supported_compr_capture_codecs); i++) {
+		if (req_codec == supported_compr_capture_codecs[i])
+			return true;
+	}
+	return false;
+}
 
 static void compr_event_handler(uint32_t opcode,
 		uint32_t token, uint32_t *payload, void *priv)
@@ -303,6 +324,7 @@ static void compr_event_handler(uint32_t opcode,
 			param.flags = time_stamp_flag;
 			param.uid =  (unsigned long)buf[prtd->out_head].phys
 					+ output_meta_data.meta_data_length;
+			param.metadata_len = COMPRE_OUTPUT_METADATA_SIZE;
 			if (q6asm_async_write(prtd->audio_client,
 						&param) < 0)
 				pr_err("%s:q6asm_async_write failed\n",
@@ -402,25 +424,6 @@ static int msm_compr_playback_prepare(struct snd_pcm_substream *substream)
 			pr_err("%s: DDP CMD CFG failed\n", __func__);
 		break;
 	}
-	case SND_AUDIOCODEC_PCM: {
-		uint16_t bits_per_sample = 16;
-		pr_debug("%s: SND_AUDIOCODEC_PCM\n", __func__);
-		switch (runtime->format) {
-		case SNDRV_PCM_FORMAT_S16_LE:
-			bits_per_sample = 16;
-			break;
-		case SNDRV_PCM_FORMAT_S24_LE:
-			bits_per_sample = 24;
-			break;
-		}
-		ret = q6asm_media_format_block_multi_ch_pcm_v2(
-				prtd->audio_client, runtime->rate,
-				runtime->channels, !prtd->set_channel_map,
-				prtd->channel_map, bits_per_sample);
-		if (ret < 0)
-			pr_info("%s: CMD Format block failed\n", __func__);
-		break;
-	}
 	default:
 		return -EINVAL;
 	}
@@ -446,6 +449,11 @@ static int msm_compr_capture_prepare(struct snd_pcm_substream *substream)
 	prtd->pcm_count = snd_pcm_lib_period_bytes(substream);
 	prtd->pcm_irq_pos = 0;
 
+	if (!msm_compr_capture_codecs(codec->id)) {
+		/*request codec invalid or not supported,
+		use default compress format*/
+		codec->id = SND_AUDIOCODEC_AMRWB;
+	}
 	/* rate and channels are sent to audio driver */
 	prtd->samp_rate = runtime->rate;
 	prtd->channel_mode = runtime->channels;
@@ -459,8 +467,12 @@ static int msm_compr_capture_prepare(struct snd_pcm_substream *substream)
 		pr_debug("SND_AUDIOCODEC_AMRWB\n");
 		ret = q6asm_enc_cfg_blk_amrwb(prtd->audio_client,
 			MAX_NUM_FRAMES_PER_BUFFER,
-			codec->options.generic.reserved[0] /*bitrate 0-8*/,
-			codec->options.generic.reserved[1] /*dtx mode 0/1*/);
+			/* use fixed band mode and dtx mode
+			 *  band mode - 23.85 kbps
+                         */
+			AMR_WB_BAND_MODE,
+			/* dtx mode - disable */
+			AMR_WB_DTX_MODE);
 		if (ret < 0)
 			pr_err("%s: CMD Format block" \
 				"failed: %d\n", __func__, ret);
@@ -518,6 +530,13 @@ static int msm_compr_trigger(struct snd_pcm_substream *substream, int cmd)
 		prtd->pcm_irq_pos = 0;
 
 		if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
+			if (!msm_compr_capture_codecs(
+				compr->info.codec_param.codec.id)) {
+				/*request codec invalid or not supported,
+				use default compress format*/
+				compr->info.codec_param.codec.id =
+				SND_AUDIOCODEC_AMRWB;
+			}
 			switch (compr->info.codec_param.codec.id) {
 			case SND_AUDIOCODEC_AMRWB:
 				break;
@@ -571,7 +590,7 @@ static void populate_codec_list(struct compr_audio *compr,
 {
 	pr_debug("%s\n", __func__);
 	/* MP3 Block */
-	compr->info.compr_cap.num_codecs = 6;
+	compr->info.compr_cap.num_codecs = 5;
 	compr->info.compr_cap.min_fragment_size = runtime->hw.period_bytes_min;
 	compr->info.compr_cap.max_fragment_size = runtime->hw.period_bytes_max;
 	compr->info.compr_cap.min_fragments = runtime->hw.periods_min;
@@ -581,7 +600,6 @@ static void populate_codec_list(struct compr_audio *compr,
 	compr->info.compr_cap.codecs[2] = SND_AUDIOCODEC_AC3;
 	compr->info.compr_cap.codecs[3] = SND_AUDIOCODEC_EAC3;
 	compr->info.compr_cap.codecs[4] = SND_AUDIOCODEC_AMRWB;
-	compr->info.compr_cap.codecs[5] = SND_AUDIOCODEC_PCM;
 	/* Add new codecs here */
 }
 
@@ -634,7 +652,6 @@ static int msm_compr_open(struct snd_pcm_substream *substream)
 		pr_info("snd_pcm_hw_constraint_integer failed\n");
 
 	prtd->dsp_cnt = 0;
-	prtd->set_channel_map = false;
 	atomic_set(&prtd->pending_buffer, 1);
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 		compr->codec = FORMAT_MP3;
@@ -854,6 +871,13 @@ static int msm_compr_hw_params(struct snd_pcm_substream *substream,
 			pr_err("%s: Send SoftVolume Param failed ret=%d\n",
 				__func__, ret);
 	} else if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
+		if (!msm_compr_capture_codecs(
+			compr->info.codec_param.codec.id)) {
+			/*request codec invalid or not supported,
+			use default compress format*/
+			compr->info.codec_param.codec.id =
+				SND_AUDIOCODEC_AMRWB;
+		}
 		switch (compr->info.codec_param.codec.id) {
 		case SND_AUDIOCODEC_AMRWB:
 			pr_debug("q6asm_open_read(FORMAT_AMRWB)\n");
@@ -1006,12 +1030,19 @@ static int msm_compr_ioctl(struct snd_pcm_substream *substream,
 			int i;
 			struct snd_dec_ddp *ddp =
 				&compr->info.codec_param.codec.options.ddp;
-			uint32_t params_length = ddp->params_length*sizeof(int);
+			uint32_t params_length = 0;
+			/* check integer overflow */
+			if (ddp->params_length > UINT_MAX/sizeof(int)) {
+				pr_err("%s: Integer overflow ddp->params_length %d\n",
+				__func__, ddp->params_length);
+				return -EINVAL;
+			}
+			params_length = ddp->params_length*sizeof(int);
 			if (params_length > MAX_AC3_PARAM_SIZE) {
 				/*MAX is 36*sizeof(int) this should not happen*/
-				pr_err("params_length(%d) is greater than %d",
-				params_length, MAX_AC3_PARAM_SIZE);
-				params_length = MAX_AC3_PARAM_SIZE;
+				pr_err("%s: params_length(%d) is greater than %zd\n",
+				__func__, params_length, MAX_AC3_PARAM_SIZE);
+				return -EINVAL;
 			}
 			pr_debug("SND_AUDIOCODEC_AC3\n");
 			compr->codec = FORMAT_AC3;
@@ -1043,12 +1074,18 @@ static int msm_compr_ioctl(struct snd_pcm_substream *substream,
 			int i;
 			struct snd_dec_ddp *ddp =
 				&compr->info.codec_param.codec.options.ddp;
-			uint32_t params_length = ddp->params_length*sizeof(int);
+			uint32_t params_length = 0;
+			/* check integer overflow */
+			if (ddp->params_length > UINT_MAX/sizeof(int)) {
+				pr_err("%s: Integer overflow ddp->params_length %d\n",
+				__func__, ddp->params_length);
+				return -EINVAL;
+			}
 			if (params_length > MAX_AC3_PARAM_SIZE) {
 				/*MAX is 36*sizeof(int) this should not happen*/
-				pr_err("params_length(%d) is greater than %d",
-				params_length, MAX_AC3_PARAM_SIZE);
-				params_length = MAX_AC3_PARAM_SIZE;
+				pr_err("%s: params_length(%d) is greater than %d\n",
+				__func__, params_length, MAX_AC3_PARAM_SIZE);
+				return -EINVAL;
 			}
 			pr_debug("SND_AUDIOCODEC_EAC3\n");
 			compr->codec = FORMAT_EAC3;
@@ -1073,19 +1110,10 @@ static int msm_compr_ioctl(struct snd_pcm_substream *substream,
 			}
 			break;
 		}
-		case SND_AUDIOCODEC_PCM: {
-			pr_debug("%s: FORMAT_LINEAR_PCM\n", __func__);
+		default:
+			pr_debug("FORMAT_LINEAR_PCM\n");
 			compr->codec = FORMAT_LINEAR_PCM;
 			break;
-		}
-		case SND_AUDIOCODEC_AMRWB: {
-			pr_debug("%s: SND_AUDIOCODEC_AMRWB\n", __func__);
-			compr->codec = FORMAT_AMRWB;
-			break;
-		}
-		default:
-			pr_debug("%s: invalid codec\n", __func__);
-			return -EINVAL;
 		}
 		return 0;
 	case SNDRV_PCM_IOCTL1_RESET:
@@ -1210,64 +1238,6 @@ static int msm_compr_restart(struct snd_pcm_substream *substream)
 	return 0;
 }
 
-static int msm_compr_chmap_ctl_put(struct snd_kcontrol *kcontrol,
-				struct snd_ctl_elem_value *ucontrol)
-{
-	int i;
-	struct snd_pcm_chmap *info = snd_kcontrol_chip(kcontrol);
-	unsigned int idx = snd_ctl_get_ioffidx(kcontrol, &ucontrol->id);
-	struct snd_pcm_substream *substream;
-	struct msm_audio *prtd;
-
-	pr_debug("%s", __func__);
-	substream = snd_pcm_chmap_substream(info, idx);
-	if (!substream)
-		return -ENODEV;
-	if (!substream->runtime)
-		return 0;
-
-	prtd = substream->runtime->private_data;
-	if (prtd) {
-		prtd->set_channel_map = true;
-			for (i = 0; i < PCM_FORMAT_MAX_NUM_CHANNEL; i++)
-				prtd->channel_map[i] =
-				(char)(ucontrol->value.integer.value[i]);
-	}
-	return 0;
-}
-
-static int msm_compr_chmap_ctl_get(struct snd_kcontrol *kcontrol,
-				struct snd_ctl_elem_value *ucontrol)
-{
-	int i;
-	struct snd_pcm_chmap *info = snd_kcontrol_chip(kcontrol);
-	unsigned int idx = snd_ctl_get_ioffidx(kcontrol, &ucontrol->id);
-	struct snd_pcm_substream *substream;
-	struct msm_audio *prtd;
-
-	pr_debug("%s", __func__);
-	substream = snd_pcm_chmap_substream(info, idx);
-	if (!substream)
-		return -ENODEV;
-	memset(ucontrol->value.integer.value, 0,
-		sizeof(ucontrol->value.integer.value));
-	if (!substream->runtime)
-		return 0; /* no channels set */
-
-	prtd = substream->runtime->private_data;
-
-	if (prtd && prtd->set_channel_map == true) {
-		for (i = 0; i < PCM_FORMAT_MAX_NUM_CHANNEL; i++)
-			ucontrol->value.integer.value[i] =
-					(int)prtd->channel_map[i];
-	} else {
-		for (i = 0; i < PCM_FORMAT_MAX_NUM_CHANNEL; i++)
-			ucontrol->value.integer.value[i] = 0;
-	}
-
-	return 0;
-}
-
 static int msm_compr_volume_ctl_put(struct snd_kcontrol *kcontrol,
 				    struct snd_ctl_elem_value *ucontrol)
 {
@@ -1314,10 +1284,7 @@ static int msm_compr_add_controls(struct snd_soc_pcm_runtime *rtd)
 	int ret = 0;
 	struct snd_pcm *pcm = rtd->pcm;
 	struct snd_pcm_volume *volume_info;
-	struct snd_pcm_chmap *chmap_info;
 	struct snd_kcontrol *kctl;
-	char device_num[13];
-	int i;
 
 	dev_dbg(rtd->dev, "%s, Volume cntrl add\n", __func__);
 	ret = snd_pcm_add_volume_ctls(pcm, SNDRV_PCM_STREAM_PLAYBACK,
@@ -1329,23 +1296,6 @@ static int msm_compr_add_controls(struct snd_soc_pcm_runtime *rtd)
 	kctl->put = msm_compr_volume_ctl_put;
 	kctl->get = msm_compr_volume_ctl_get;
 	kctl->tlv.p = compr_rx_vol_gain;
-
-	pr_debug("%s, Channel map cntrl add\n", __func__);
-	ret = snd_pcm_add_chmap_ctls(pcm, SNDRV_PCM_STREAM_PLAYBACK,
-				     snd_pcm_std_chmaps,
-				     PCM_FORMAT_MAX_NUM_CHANNEL, 0,
-				     &chmap_info);
-	if (ret < 0)
-		return ret;
-	kctl = chmap_info->kctl;
-	for (i = 0; i < kctl->count; i++)
-		kctl->vd[i].access |= SNDRV_CTL_ELEM_ACCESS_WRITE;
-	snprintf(device_num, sizeof(device_num), "%d", pcm->device);
-	strlcat(kctl->id.name, device_num, sizeof(kctl->id.name));
-	pr_debug("%s, Overwriting channel map control name to: %s",
-		__func__, kctl->id.name);
-	kctl->put = msm_compr_chmap_ctl_put;
-	kctl->get = msm_compr_chmap_ctl_get;
 	return 0;
 }
 

@@ -234,13 +234,18 @@ typedef enum
     eHAL_STATUS_FT_PREAUTH_KEY_SUCCESS,
     eHAL_STATUS_FT_PREAUTH_KEY_FAILED,
 #endif
-    //CMD not Queued in SME
-    eHAL_STATUS_CMD_NOT_QUEUED,
+
     // not a real status.  Just a way to mark the maximum in the enum.
     eHAL_STATUS_MAX
 
 } eHalStatus;
 
+typedef enum
+{
+    HAL_STOP_TYPE_SYS_RESET,
+    HAL_STOP_TYPE_SYS_DEEP_SLEEP,
+    HAL_STOP_TYPE_RF_KILL,
+}tHalStopType;
 
 // macro to check for SUCCESS value of the halStatus
 #define HAL_STATUS_SUCCESS( variable ) ( eHAL_STATUS_SUCCESS == ( variable ) )

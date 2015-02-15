@@ -48,7 +48,8 @@ static inline void _do_signal_event(struct kgsl_device *device,
 {
 	int id = event->context ? event->context->id : KGSL_MEMSTORE_GLOBAL;
 
-	trace_kgsl_fire_event(id, timestamp, type, jiffies - event->created);
+	trace_kgsl_fire_event(id, timestamp, type, jiffies - event->created,
+		event->func);
 
 	if (event->func)
 		event->func(device, event->priv, id, timestamp, type);
@@ -56,8 +57,6 @@ static inline void _do_signal_event(struct kgsl_device *device,
 	list_del(&event->list);
 	kgsl_context_put(event->context);
 	kfree(event);
-
-	kgsl_active_count_put(device);
 }
 
 static void _retire_events(struct kgsl_device *device,
@@ -210,9 +209,8 @@ EXPORT_SYMBOL(kgsl_signal_events);
 int kgsl_add_event(struct kgsl_device *device, u32 id, u32 ts,
 	kgsl_event_func func, void *priv, void *owner)
 {
-	int ret;
 	struct kgsl_event *event;
-	unsigned int cur_ts;
+	unsigned int queued = 0, cur_ts;
 	struct kgsl_context *context = NULL;
 
 	BUG_ON(!mutex_is_locked(&device->mutex));
@@ -225,6 +223,24 @@ int kgsl_add_event(struct kgsl_device *device, u32 id, u32 ts,
 		if (context == NULL)
 			return -EINVAL;
 	}
+
+	/*
+	 * If the caller is creating their own timestamps, let them schedule
+	 * events in the future. Otherwise only allow timestamps that have been
+	 * queued.
+	 */
+	if (context == NULL ||
+		((context->flags & KGSL_CONTEXT_USER_GENERATED_TS) == 0)) {
+
+		queued = kgsl_readtimestamp(device, context,
+						KGSL_TIMESTAMP_QUEUED);
+
+		if (timestamp_cmp(ts, queued) > 0) {
+			kgsl_context_put(context);
+			return -EINVAL;
+		}
+	}
+
 	cur_ts = kgsl_readtimestamp(device, context, KGSL_TIMESTAMP_RETIRED);
 
 	/*
@@ -235,7 +251,7 @@ int kgsl_add_event(struct kgsl_device *device, u32 id, u32 ts,
 	 */
 
 	if (timestamp_cmp(cur_ts, ts) >= 0) {
-		trace_kgsl_fire_event(id, cur_ts, ts, 0);
+		trace_kgsl_fire_event(id, cur_ts, ts, 0, func);
 
 		func(device, priv, id, ts, KGSL_EVENT_TIMESTAMP_RETIRED);
 		kgsl_context_put(context);
@@ -248,17 +264,6 @@ int kgsl_add_event(struct kgsl_device *device, u32 id, u32 ts,
 		return -ENOMEM;
 	}
 
-	/*
-	 * Increase the active count on the device to avoid going into power
-	 * saving modes while events are pending
-	 */
-	ret = kgsl_active_count_get(device);
-	if (ret < 0) {
-		kgsl_context_put(context);
-		kfree(event);
-		return ret;
-	}
-
 	event->context = context;
 	event->timestamp = ts;
 	event->priv = priv;
@@ -266,7 +271,7 @@ int kgsl_add_event(struct kgsl_device *device, u32 id, u32 ts,
 	event->owner = owner;
 	event->created = jiffies;
 
-	trace_kgsl_register_event(id, ts);
+	trace_kgsl_register_event(id, ts, func);
 
 	/* Add the event to either the owning context or the global list */
 
@@ -333,7 +338,11 @@ void kgsl_cancel_event(struct kgsl_device *device, struct kgsl_context *context,
 		void *priv)
 {
 	struct kgsl_event *event;
-	struct list_head *head = _get_list_head(device, context);
+	struct list_head *head;
+
+	BUG_ON(!mutex_is_locked(&device->mutex));
+
+	head = _get_list_head(device, context);
 
 	event = _find_event(device, head, timestamp, func, priv);
 
@@ -400,9 +409,8 @@ void kgsl_process_events(struct work_struct *work)
 	struct kgsl_context *context, *tmp;
 	uint32_t timestamp;
 
-	mutex_lock(&device->mutex);
+	kgsl_mutex_lock(&device->mutex, &device->mutex_owner);
 
-	/* Process expired global events */
 	timestamp = kgsl_readtimestamp(device, NULL, KGSL_TIMESTAMP_RETIRED);
 	_retire_events(device, &device->events, timestamp);
 	_mark_next_event(device, &device->events);
@@ -415,17 +423,19 @@ void kgsl_process_events(struct work_struct *work)
 		 * Increment the refcount to make sure that the list_del_init
 		 * is called with a valid context's list
 		 */
-		_kgsl_context_get(context);
-		/*
-		 * If kgsl_timestamp_expired_context returns 0 then it no longer
-		 * has any pending events and can be removed from the list
-		 */
+		if (_kgsl_context_get(context)) {
+			/*
+			 * If kgsl_timestamp_expired_context returns 0 then it
+			 * no longer has any pending events and can be removed
+			 * from the list
+			 */
 
-		if (kgsl_process_context_events(device, context) == 0)
-			list_del_init(&context->events_list);
-		kgsl_context_put(context);
+			if (kgsl_process_context_events(device, context) == 0)
+				list_del_init(&context->events_list);
+			kgsl_context_put(context);
+		}
 	}
 
-	mutex_unlock(&device->mutex);
+	kgsl_mutex_unlock(&device->mutex, &device->mutex_owner);
 }
 EXPORT_SYMBOL(kgsl_process_events);

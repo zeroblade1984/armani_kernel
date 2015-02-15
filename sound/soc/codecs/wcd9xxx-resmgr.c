@@ -92,8 +92,8 @@ static char wcd9xxx_event_string[][64] = {
 
 	"WCD9XXX_EVENT_POST_RESUME",
 
-	"WCD9XXX_EVENT_PRE_TX_3_ON",
-	"WCD9XXX_EVENT_POST_TX_3_OFF",
+	"WCD9XXX_EVENT_PRE_TX_1_3_ON",
+	"WCD9XXX_EVENT_POST_TX_1_3_OFF",
 
 	"WCD9XXX_EVENT_LAST",
 };
@@ -565,10 +565,12 @@ void wcd9xxx_resmgr_put_clk_block(struct wcd9xxx_resmgr *resmgr,
 		    resmgr->clk_type == WCD9XXX_CLK_RCO) {
 			wcd9xxx_disable_clock_block(resmgr);
 			/* if RCO is enabled, switch from it */
-			if (snd_soc_read(resmgr->codec, WCD9XXX_A_RC_OSC_FREQ) & 0x80) {
-				if (resmgr->codec_type != WCD9XXX_CDC_TYPE_HELICON)
-					snd_soc_write(resmgr->codec, WCD9XXX_A_CLK_BUFF_EN2,
-							0x02);
+			if (snd_soc_read(resmgr->codec, WCD9XXX_A_RC_OSC_FREQ)
+					& 0x80) {
+				if (resmgr->codec_type !=
+						WCD9XXX_CDC_TYPE_HELICON)
+					snd_soc_write(resmgr->codec,
+						WCD9XXX_A_CLK_BUFF_EN2, 0x02);
 				wcd9xxx_resmgr_enable_config_mode(resmgr, 0);
 			}
 			resmgr->clk_type = WCD9XXX_CLK_OFF;

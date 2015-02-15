@@ -1,6 +1,6 @@
 /* ehci-msm-hsic.c - HSUSB Host Controller Driver Implementation
  *
- * Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2011-2014, The Linux Foundation. All rights reserved.
  *
  * Partly derived from ehci-fsl.c and ehci-hcd.c
  * Copyright (c) 2000-2004 by David Brownell
@@ -1082,7 +1082,6 @@ static int ehci_hsic_reset(struct usb_hcd *hcd)
 	struct msm_hsic_hcd *mehci = hcd_to_hsic(hcd);
 	struct msm_hsic_host_platform_data *pdata = mehci->dev->platform_data;
 	int retval;
-	u32 temp;
 
 	mehci->timer = USB_HS_GPTIMER_BASE;
 	ehci->caps = USB_CAPLENGTH;
@@ -1119,12 +1118,6 @@ static int ehci_hsic_reset(struct usb_hcd *hcd)
 		writel_relaxed(0x08 | MSM_USB_ASYNC_BRIDGE_BYPASS, USB_AHBMODE);
 	else
 		writel_relaxed(0x08, USB_AHBMODE);
-
-	if (pdata->dis_internal_clk_gating) {
-		temp = readl_relaxed(USB_GENCONFIG2);
-		temp &= ~GENCFG2_SYS_CLK_HOST_DEV_GATE_EN;
-		writel_relaxed(temp, USB_GENCONFIG2);
-	}
 
 	/* Disable streaming mode and select host mode */
 	writel_relaxed(0x13, USB_USBMODE);
@@ -1493,7 +1486,7 @@ static struct hc_driver msm_hsic_driver = {
 	 * generic hardware linkage
 	 */
 	.irq			= msm_hsic_irq,
-	.flags			= HCD_USB2 | HCD_MEMORY | HCD_OLD_ENUM,
+	.flags			= HCD_USB2 | HCD_MEMORY | HCD_RT_OLD_ENUM,
 
 	.reset			= ehci_hsic_reset,
 	.start			= ehci_run,
@@ -1906,8 +1899,6 @@ struct msm_hsic_host_platform_data *msm_hsic_dt_to_pdata(
 
 	pdata->phy_sof_workaround = of_property_read_bool(node,
 					"qcom,phy-sof-workaround");
-	pdata->dis_internal_clk_gating = of_property_read_bool(node,
-					"qcom,disable-internal-clk-gating");
 	pdata->phy_susp_sof_workaround = of_property_read_bool(node,
 					"qcom,phy-susp-sof-workaround");
 	pdata->ignore_cal_pad_config = of_property_read_bool(node,
@@ -2271,6 +2262,9 @@ static int __devexit ehci_hsic_msm_remove(struct platform_device *pdev)
 	wake_lock_destroy(&mehci->wlock);
 	iounmap(hcd->regs);
 	usb_put_hcd(hcd);
+
+	if (pdev->dev.of_node)
+		pdev->dev.platform_data = NULL;
 
 	return 0;
 }

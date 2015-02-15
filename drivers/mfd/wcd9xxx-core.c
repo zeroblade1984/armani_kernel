@@ -555,6 +555,7 @@ static const struct intr_data intr_tbl_v2[] = {
 	{WCD9XXX_IRQ_EAR_PA_OCPL_FAULT, false},
 	{WCD9XXX_IRQ_HPH_L_PA_STARTUP, false},
 	{WCD9XXX_IRQ_HPH_R_PA_STARTUP, false},
+	{WCD9320_IRQ_EAR_PA_STARTUP, false},
 	{WCD9XXX_IRQ_RESERVED_0, false},
 	{WCD9XXX_IRQ_RESERVED_1, false},
 	{WCD9XXX_IRQ_MAD_AUDIO, false},
@@ -1672,10 +1673,8 @@ static int wcd9xxx_device_up(struct wcd9xxx *wcd9xxx)
 		wcd9xxx->slim_device_bootup = false;
 		return 0;
 	}
-	ret = wcd9xxx_reset(wcd9xxx);
-	if (ret)
-		pr_err("%s: Resetting Codec failed\n", __func__);
 
+	dev_info(wcd9xxx->dev, "%s: codec bring up\n", __func__);
 	wcd9xxx_bring_up(wcd9xxx);
 	ret = wcd9xxx_irq_init(wcd9xxx_res);
 	if (ret) {
@@ -1687,6 +1686,25 @@ static int wcd9xxx_device_up(struct wcd9xxx *wcd9xxx)
 	return ret;
 }
 
+static int wcd9xxx_slim_device_reset(struct slim_device *sldev)
+{
+	int ret;
+	struct wcd9xxx *wcd9xxx = slim_get_devicedata(sldev);
+	if (!wcd9xxx) {
+		pr_err("%s: wcd9xxx is NULL\n", __func__);
+		return -EINVAL;
+	}
+
+	dev_info(wcd9xxx->dev, "%s: device reset\n", __func__);
+	if (wcd9xxx->slim_device_bootup)
+		return 0;
+	ret = wcd9xxx_reset(wcd9xxx);
+	if (ret)
+		dev_err(wcd9xxx->dev, "%s: Resetting Codec failed\n", __func__);
+
+	return ret;
+}
+
 static int wcd9xxx_slim_device_up(struct slim_device *sldev)
 {
 	struct wcd9xxx *wcd9xxx = slim_get_devicedata(sldev);
@@ -1694,7 +1712,7 @@ static int wcd9xxx_slim_device_up(struct slim_device *sldev)
 		pr_err("%s: wcd9xxx is NULL\n", __func__);
 		return -EINVAL;
 	}
-	dev_dbg(wcd9xxx->dev, "%s: device up\n", __func__);
+	dev_info(wcd9xxx->dev, "%s: slim device up\n", __func__);
 	return wcd9xxx_device_up(wcd9xxx);
 }
 
@@ -1702,6 +1720,7 @@ static int wcd9xxx_slim_device_down(struct slim_device *sldev)
 {
 	struct wcd9xxx *wcd9xxx = slim_get_devicedata(sldev);
 
+	dev_info(wcd9xxx->dev, "%s: device down\n", __func__);
 	if (!wcd9xxx) {
 		pr_err("%s: wcd9xxx is NULL\n", __func__);
 		return -EINVAL;
@@ -1825,6 +1844,7 @@ static struct slim_driver taiko_slim_driver = {
 	.resume = wcd9xxx_slim_resume,
 	.suspend = wcd9xxx_slim_suspend,
 	.device_up = wcd9xxx_slim_device_up,
+	.reset_device = wcd9xxx_slim_device_reset,
 	.device_down = wcd9xxx_slim_device_down,
 };
 
@@ -1844,6 +1864,7 @@ static struct slim_driver tapan_slim_driver = {
 	.resume = wcd9xxx_slim_resume,
 	.suspend = wcd9xxx_slim_suspend,
 	.device_up = wcd9xxx_slim_device_up,
+	.reset_device = wcd9xxx_slim_device_reset,
 	.device_down = wcd9xxx_slim_device_down,
 };
 
