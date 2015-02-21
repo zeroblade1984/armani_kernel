@@ -1,4 +1,4 @@
-/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -74,6 +74,7 @@ void mdp3_check_dsi_ctrl_status(struct work_struct *work,
 		return;
 	}
 
+	ret = ctrl_pdata->check_status(ctrl_pdata);
 	mutex_unlock(&mdp3_session->lock);
 
 	if ((pdsi_status->mfd->panel_power_on)) {

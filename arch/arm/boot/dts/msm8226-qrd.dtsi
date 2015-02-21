@@ -414,7 +414,7 @@
 			};
 		};
 
-qcom,leds@a500 {
+		qcom,leds@a500 {
 			status = "okay";
 			qcom,led_mpp_6 {
 				label = "mpp";
@@ -537,20 +537,20 @@ qcom,leds@a500 {
 	};
 
 	gpio@c500 { /* GPIO 6 */
-	qcom,vin-sel = <3>;
+		qcom,vin-sel = <3>;
 	};
 
 	gpio@c600 { /* GPIO 7 */
 	};
 
 	gpio@c700 { /* GPIO 8 */
-	    qcom,mode = <1>;
-        qcom,output-type = <0>;
-        qcom,pull = <5>;
-        qcom,vin-sel = <3>;
-        qcom,out-strength = <3>;
-        qcom,src-sel = <5>;
-        qcom,master-en = <1>;
+		qcom,mode = <1>;
+		qcom,output-type = <0>;
+		qcom,pull = <5>;
+		qcom,vin-sel = <3>;
+		qcom,out-strength = <3>;
+		qcom,src-sel = <5>;
+		qcom,master-en = <1>;
 		qcom,invert = <0>;
 	};
 };

@@ -120,6 +120,13 @@ int msm_v4l2_g_ctrl(struct file *file, void *fh,
 	return msm_vidc_g_ctrl((void *)vidc_inst, a);
 }
 
+int msm_v4l2_s_ext_ctrl(struct file *file, void *fh,
+					struct v4l2_ext_controls *a)
+{
+	struct msm_vidc_inst *vidc_inst = get_vidc_inst(file, fh);
+	return msm_vidc_s_ext_ctrl((void *)vidc_inst, a);
+}
+
 int msm_v4l2_reqbufs(struct file *file, void *fh,
 				struct v4l2_requestbuffers *b)
 {
@@ -242,6 +249,7 @@ static const struct v4l2_ioctl_ops msm_v4l2_ioctl_ops = {
 	.vidioc_streamoff = msm_v4l2_streamoff,
 	.vidioc_s_ctrl = msm_v4l2_s_ctrl,
 	.vidioc_g_ctrl = msm_v4l2_g_ctrl,
+	.vidioc_s_ext_ctrls = msm_v4l2_s_ext_ctrl,
 	.vidioc_subscribe_event = msm_v4l2_subscribe_event,
 	.vidioc_unsubscribe_event = msm_v4l2_unsubscribe_event,
 	.vidioc_decoder_cmd = msm_v4l2_decoder_cmd,
@@ -311,7 +319,6 @@ static int msm_vidc_initialize_core(struct platform_device *pdev,
 	}
 
 	INIT_LIST_HEAD(&core->instances);
-	mutex_init(&core->sync_lock);
 	mutex_init(&core->lock);
 
 	core->state = VIDC_CORE_UNINIT;
@@ -320,6 +327,7 @@ static int msm_vidc_initialize_core(struct platform_device *pdev,
 		init_completion(&core->completions[i]);
 	}
 
+	INIT_DELAYED_WORK(&core->fw_unload_work, msm_vidc_fw_unload_handler);
 	return rc;
 }
 

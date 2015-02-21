@@ -107,6 +107,7 @@ enum power_supply_property {
 	POWER_SUPPLY_PROP_INPUT_CURRENT_MAX,
 	POWER_SUPPLY_PROP_INPUT_CURRENT_TRIM,
 	POWER_SUPPLY_PROP_INPUT_CURRENT_SETTLED,
+	POWER_SUPPLY_PROP_VCHG_LOOP_DBC_BYPASS,
 	POWER_SUPPLY_PROP_CURRENT_NOW,
 	POWER_SUPPLY_PROP_CURRENT_AVG,
 	POWER_SUPPLY_PROP_POWER_NOW,
@@ -285,7 +286,7 @@ static inline int power_supply_register(struct device *parent,
 static inline void power_supply_unregister(struct power_supply *psy) { }
 static inline int power_supply_powers(struct power_supply *psy,
 				      struct device *dev)
-				      	    { return -ENOSYS; }
+							{ return -ENOSYS; }
 extern int register_power_supply_notifier(struct notifier_block*)
 							{ return -ENOSYS; }
 extern int unregister_power_supply_notifier(struct notifier_block*)

@@ -129,7 +129,7 @@ static int mdss_dsi_get_dt_vreg_data(struct device *dev,
 	if (!dev || !mp) {
 		pr_err("%s: invalid input\n", __func__);
 		rc = -EINVAL;
-		goto error;
+		return rc;
 	}
 
 	of_node = dev->of_node;
@@ -715,6 +715,7 @@ static int mdss_dsi_unblank(struct mdss_panel_data *pdata)
 	int ret = 0;
 	struct mipi_panel_info *mipi;
 	struct mdss_dsi_ctrl_pdata *ctrl_pdata = NULL;
+	static int exec_count = 0;
 
 	pr_debug("%s+:\n", __func__);
 
@@ -741,6 +742,18 @@ static int mdss_dsi_unblank(struct mdss_panel_data *pdata)
 		if (mipi->vsync_enable && mipi->hw_vsync_mode
 			&& gpio_is_valid(ctrl_pdata->disp_te_gpio)) {
 				mdss_dsi_set_tear_on(ctrl_pdata);
+		}
+	}
+	
+	if (pdata->panel_info.cont_splash_enabled && (exec_count == 0)) {
+		exec_count = 1;
+	} else {
+		if (mipi->force_clk_lane_hs) {
+			u32 tmp;
+			tmp = MIPI_INP((ctrl_pdata->ctrl_base) + 0xac);
+			tmp &= ~(1<<28);
+			MIPI_OUTP((ctrl_pdata->ctrl_base) + 0xac, tmp);
+			wmb();
 		}
 	}
 
@@ -955,6 +968,15 @@ static int mdss_dsi_ctl_partial_update(struct mdss_panel_data *pdata)
 	return rc;
 }
 
+int mdss_dsi_register_recovery_handler(struct mdss_dsi_ctrl_pdata *ctrl,
+	struct mdss_panel_recovery *recovery)
+{
+	mutex_lock(&ctrl->mutex);
+	ctrl->recovery = recovery;
+	mutex_unlock(&ctrl->mutex);
+	return 0;
+}
+
 static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 				  int event, void *arg)
 {
@@ -1006,7 +1028,6 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 		mdss_dsi_clk_req(ctrl_pdata, (int)arg);
 		break;
 	case MDSS_EVENT_DSI_CMDLIST_KOFF:
-		ctrl_pdata->recovery = (struct mdss_panel_recovery *)arg;
 		mdss_dsi_cmdlist_commit(ctrl_pdata, 1);
 		break;
 	case MDSS_EVENT_PANEL_UPDATE_FPS:
@@ -1027,6 +1048,10 @@ static int mdss_dsi_event_handler(struct mdss_panel_data *pdata,
 		break;
 	case MDSS_EVENT_DSI_ULPS_CTRL:
 		rc = mdss_dsi_ulps_config(ctrl_pdata, (int)arg);
+		break;
+	case MDSS_EVENT_REGISTER_RECOVERY_HANDLER:
+		rc = mdss_dsi_register_recovery_handler(ctrl_pdata,
+			(struct mdss_panel_recovery *)arg);
 		break;
 	default:
 		pr_debug("%s: unhandled event=%d\n", __func__, event);

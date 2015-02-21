@@ -232,11 +232,15 @@ void extract_dci_pkt_rsp(struct diag_smd_info *smd_info, unsigned char *buf)
 	curr_client_pid = req_entry->pid;
 
 	/* Remove the headers and send only the response to this function */
+	mutex_lock(&driver->dci_mutex);
 	delete_flag = diag_dci_remove_req_entry(buf + 8 + cmd_code_len,
 						write_len - 4,
 						req_entry);
-	if (delete_flag < 0)
+	if (delete_flag < 0) {
+		mutex_unlock(&driver->dci_mutex);
 		return;
+	}
+	mutex_unlock(&driver->dci_mutex);
 
 	/* Using PID of client process, find client buffer */
 	i = diag_dci_find_client_index(curr_client_pid);
@@ -531,7 +535,8 @@ void diag_dci_notify_client(int peripheral_mask, int data)
 static int diag_send_dci_pkt(struct diag_master_table entry, unsigned char *buf,
 					 int len, int tag)
 {
-	int i, status = 0;
+	int i;
+	static int status;
 	unsigned int read_len = 0;
 
 	/* The first 4 bytes is the uid tag and the next four bytes is
