@@ -102,6 +102,9 @@
 			qcom,ibat-calibration-enabled;
 			qcom,batt-hot-percentage = <25>;
 	                qcom,batt-cold-percentage = <80>;
+			qcom,maxinput-usb-ma = <1800>;
+			qcom,use-external-rsense;
+			qcom,ext-ovp-present;
 
 			pm8226_chg_chgr: qcom,chgr@1000 {
 				status = "disabled";
