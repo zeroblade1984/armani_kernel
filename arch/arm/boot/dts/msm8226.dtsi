@@ -651,7 +651,7 @@
 		reg = <0xf9017000 0x1000>;
 		interrupts = <0 3 0>, <0 4 0>;
 		qcom,bark-time = <20000>;
-		qcom,pet-time = <15000>;
+		qcom,pet-time = <18000>;
 		qcom,ipi-ping;
 	};
 
