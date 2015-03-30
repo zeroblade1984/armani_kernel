@@ -133,6 +133,23 @@ static unsigned int up_threshold_any_cpu_load;
 static unsigned int sync_freq;
 static unsigned int up_threshold_any_cpu_freq;
 
+#define DEF_REFLEX_LOW_STEP           		(5)
+#define DEF_REFLEX_HIGH_STEP             	(8)
+#define DEF_REFLEX_LOW_STEP_SAMPLE		(65)
+#define DEF_REFLEX_HIGH_STEP_SAMPLE		(89)
+#define DEF_REFLEX_OPTIMAL_FREQ			(1305600)
+#define DEF_REFLEX_BOOST			(0)
+#define DEF_REFLEX_STEP_UP_RAMP_DELAY		(20000)
+
+static unsigned int reflex_low_step = DEF_REFLEX_LOW_STEP;
+static unsigned int reflex_high_step = DEF_REFLEX_HIGH_STEP;
+static unsigned int reflex_low_step_load = DEF_REFLEX_LOW_STEP_SAMPLE;
+static unsigned int reflex_high_step_load = DEF_REFLEX_HIGH_STEP_SAMPLE;
+static unsigned int optimal_max_freq = DEF_REFLEX_OPTIMAL_FREQ;
+static unsigned int reflex_boost= DEF_REFLEX_BOOST;
+static unsigned int reflex_ramp_delay = DEF_REFLEX_STEP_UP_RAMP_DELAY;
+static unsigned int backup_hispeed_freq;
+
 static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 		unsigned int event);
 
@@ -1175,6 +1192,135 @@ static struct global_attr up_threshold_any_cpu_freq_attr =
 		show_up_threshold_any_cpu_freq,
 				store_up_threshold_any_cpu_freq);
 
+
+#define show_one(file_name, object)					\
+static ssize_t show_##file_name						\
+(struct kobject *kobj, struct attribute *attr, char *buf)              \
+{									\
+	return sprintf(buf, "%u\n", object);		\
+}
+show_one(reflex_low_step, reflex_low_step);
+show_one(reflex_high_step, reflex_high_step);
+show_one(reflex_low_step_load, reflex_low_step_load);
+show_one(reflex_high_step_load, reflex_high_step_load);
+show_one(optimal_max_freq, optimal_max_freq);
+show_one(reflex_boost, reflex_boost);
+show_one(reflex_ramp_delay,reflex_ramp_delay);
+
+
+
+static ssize_t store_reflex_low_step(struct kobject *a, struct attribute *b,
+				   const char *buf, size_t count)
+{
+	unsigned int input;
+	int ret;
+
+	ret = sscanf(buf, "%u", &input);
+	if (ret != 1)
+		return -EINVAL;
+	reflex_low_step = input;
+	return count;
+}
+
+static ssize_t store_reflex_high_step(struct kobject *a, struct attribute *b,
+				   const char *buf, size_t count)
+{
+	unsigned int input;
+	int ret;
+
+	ret = sscanf(buf, "%u", &input);
+	if (ret != 1)
+		return -EINVAL;
+	reflex_high_step = input;
+	return count;
+}
+
+static ssize_t store_reflex_low_step_load(struct kobject *a,
+			struct attribute *b, const char *buf, size_t count)
+{
+	unsigned int input;
+	int ret;
+	ret = sscanf(buf, "%u", &input);
+
+	if (ret != 1)
+		return -EINVAL;
+	reflex_low_step_load = input;
+	return count;
+}
+
+static ssize_t store_reflex_high_step_load(struct kobject *a,
+			struct attribute *b, const char *buf, size_t count)
+{
+	unsigned int input;
+	int ret;
+	ret = sscanf(buf, "%u", &input);
+
+	if (ret != 1)
+		return -EINVAL;
+	reflex_high_step_load = input;
+	return count;
+}
+
+static ssize_t store_optimal_max_freq(struct kobject *a, struct attribute *b,
+				   const char *buf, size_t count)
+{
+	unsigned int input;
+	int ret;
+
+	ret = sscanf(buf, "%u", &input);
+	if (ret != 1)
+		return -EINVAL;
+	optimal_max_freq = input;
+	if(reflex_boost)
+		hispeed_freq = optimal_max_freq;
+	return count;
+}
+
+static ssize_t store_reflex_boost(struct kobject *a, struct attribute *b,
+				   const char *buf, size_t count)
+{
+	unsigned int input;
+	int ret;
+
+	ret = sscanf(buf, "%u", &input);
+	if (ret != 1)
+		return -EINVAL;
+	reflex_boost= input;
+	if(reflex_boost)
+		hispeed_freq = optimal_max_freq;
+	else
+		hispeed_freq = backup_hispeed_freq;
+	return count;
+}
+
+static ssize_t store_reflex_ramp_delay(struct kobject *a, struct attribute *b,
+				   const char *buf, size_t count)
+{
+	unsigned int input;
+	int ret;
+
+	ret = sscanf(buf, "%u", &input);
+	if (ret != 1)
+		return -EINVAL;
+	reflex_ramp_delay = input;
+	return count;
+}
+
+static struct global_attr reflex_low_step_attr = __ATTR(reflex_low_step, 0644,
+		show_reflex_low_step, store_reflex_low_step);
+static struct global_attr reflex_high_step_attr = __ATTR(reflex_high_step, 0644,
+		show_reflex_high_step, store_reflex_high_step);
+static struct global_attr reflex_low_step_load_attr = __ATTR(reflex_low_step_load, 0644,
+		show_reflex_low_step_load, store_reflex_low_step_load);
+static struct global_attr reflex_high_step_load_attr = __ATTR(reflex_high_step_load, 0644,
+		show_reflex_high_step_load, store_reflex_high_step_load);
+static struct global_attr optimal_max_freq_attr = __ATTR(optimal_max_freq, 0644,
+		show_optimal_max_freq, store_optimal_max_freq);
+static struct global_attr reflex_boost_attr = __ATTR(reflex_boost, 0644,
+		show_reflex_boost, store_reflex_boost);
+static struct global_attr reflex_ramp_delay_attr = __ATTR(reflex_ramp_delay, 0644,
+		show_reflex_ramp_delay, store_reflex_ramp_delay);
+
 static struct attribute *interactive_attributes[] = {
 	&target_loads_attr.attr,
 	&above_hispeed_delay_attr.attr,
@@ -1191,6 +1337,13 @@ static struct attribute *interactive_attributes[] = {
 	&sync_freq_attr.attr,
 	&up_threshold_any_cpu_load_attr.attr,
 	&up_threshold_any_cpu_freq_attr.attr,
+	&reflex_low_step_attr.attr,
+	&reflex_high_step_attr.attr,
+	&reflex_low_step_load_attr.attr,
+	&reflex_high_step_load_attr.attr,
+	&optimal_max_freq_attr.attr,
+	&reflex_boost_attr.attr,
+	&reflex_ramp_delay_attr.attr,
 	NULL,
 };
 
