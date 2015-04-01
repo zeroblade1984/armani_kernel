@@ -47,7 +47,7 @@ static struct zram *zram_devices;
 #define ALLOC_ERROR_LOG_RATE_MS 1000
 
 /* Module params (documentation at end) */
-static unsigned int num_devices = 1;
+static unsigned int num_devices = 4;
 
 static inline struct zram *dev_to_zram(struct device *dev)
 {
