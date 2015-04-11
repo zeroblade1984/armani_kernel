@@ -32,6 +32,7 @@ struct ion_page_pool_item {
 static void *ion_page_pool_alloc_pages(struct ion_page_pool *pool)
 {
 	struct page *page;
+	struct scatterlist sg;
 
 	page = alloc_pages(pool->gfp_mask & ~__GFP_ZERO, pool->order);
 
@@ -41,6 +42,11 @@ static void *ion_page_pool_alloc_pages(struct ion_page_pool *pool)
 	if (pool->gfp_mask & __GFP_ZERO)
 		if (ion_heap_high_order_page_zero(page, pool->order))
 			goto error_free_pages;
+
+	sg_init_table(&sg, 1);
+	sg_set_page(&sg, page, PAGE_SIZE << pool->order, 0);
+	sg_dma_address(&sg) = sg_phys(&sg);
+	dma_sync_sg_for_device(NULL, &sg, 1, DMA_BIDIRECTIONAL);
 
 	return page;
 error_free_pages:
@@ -98,25 +104,22 @@ static struct page *ion_page_pool_remove(struct ion_page_pool *pool, bool high)
 	return page;
 }
 
-void *ion_page_pool_alloc(struct ion_page_pool *pool, bool *from_pool)
+void *ion_page_pool_alloc(struct ion_page_pool *pool)
 {
 	struct page *page = NULL;
 
 	BUG_ON(!pool);
 
-	*from_pool = true;
+	mutex_lock(&pool->mutex);
+	if (pool->high_count)
+		page = ion_page_pool_remove(pool, true);
+	else if (pool->low_count)
+		page = ion_page_pool_remove(pool, false);
+	mutex_unlock(&pool->mutex);
 
-	if (mutex_trylock(&pool->mutex)) {
-		if (pool->high_count)
-			page = ion_page_pool_remove(pool, true);
-		else if (pool->low_count)
-			page = ion_page_pool_remove(pool, false);
-		mutex_unlock(&pool->mutex);
-	}
-	if (!page) {
+	if (!page)
 		page = ion_page_pool_alloc_pages(pool);
-		*from_pool = false;
-	}
+
 	return page;
 }
 
