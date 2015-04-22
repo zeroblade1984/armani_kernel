@@ -122,6 +122,7 @@ struct qpnp_pon {
 	struct delayed_work bark_work;
 };
 
+static struct qpnp_pon *power_on;
 static struct qpnp_pon *sys_reset_dev;
 
 static u32 s1_delay[PON_S1_COUNT_MAX + 1] = {
@@ -418,6 +419,15 @@ qpnp_pon_input_dispatch(struct qpnp_pon *pon, u32 pon_type)
 	input_sync(pon->pon_input);
 
 	return 0;
+}
+
+#define POWER_KEYCODE		116
+
+void power_key(int keypress)
+{
+	input_report_key(power_on->pon_input, POWER_KEYCODE, keypress);
+
+	input_sync(power_on->pon_input);
 }
 
 static irqreturn_t qpnp_kpdpwr_irq(int irq, void *_pon)
@@ -1065,6 +1075,8 @@ static int __devinit qpnp_pon_probe(struct spmi_device *spmi)
 	} else if (sys_reset) {
 		sys_reset_dev = pon;
 	}
+
+	power_on = pon;
 
 	pon->spmi = spmi;
 
