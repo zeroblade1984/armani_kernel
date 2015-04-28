@@ -3059,4 +3059,12 @@ config HAS_MACH_MEMUTILS
 	help
 	Faster memcpy performance for Krait
 
+config XIAOMI_ARMANI_DTB
+	depends on ARCH_MSM8226
+	default n
+	bool "Xiaomi Armani Device DTBs"
+	help
+	  Only include Xiaomi Armani specific DTBs to limit the number that
+	  get built during kernel compilation.
+
 endif
