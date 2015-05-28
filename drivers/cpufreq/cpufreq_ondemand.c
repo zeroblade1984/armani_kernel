@@ -1015,7 +1015,7 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 
 		if (policy->cur == policy->max)
 			return;
-		freq_target = dbs_freq_increase_target(policy, this_dbs_info);
+		freq_target = dbs_freq_increase(policy, this_dbs_info);
 
 		if (freq_target > policy->max)
 			freq_target = policy->max;
@@ -1488,16 +1488,7 @@ static int __init cpufreq_gov_dbs_init(void)
 		dbs_work->cpu = i;
 
 		atomic_set(&this_dbs_info->src_sync_cpu, -1);
-		init_waitqueue_head(&this_dbs_info->sync_wq);
-
-		this_dbs_info->sync_thread = kthread_run(dbs_sync_thread,
-							 (void *)i,
-							 "dbs_sync/%d", i);
 	}
-
-	inp_filter_timer.data = 0;
-	init_timer(&inp_filter_timer);
-	inp_filter_timer.function = cpufreq_ondemand_inp_filter_timer;
 
 	return cpufreq_register_governor(&cpufreq_gov_ondemand);
 }
@@ -1511,7 +1502,6 @@ static void __exit cpufreq_gov_dbs_exit(void)
 		struct cpu_dbs_info_s *this_dbs_info =
 			&per_cpu(od_cpu_dbs_info, i);
 		mutex_destroy(&this_dbs_info->timer_mutex);
-		kthread_stop(this_dbs_info->sync_thread);
 	}
 	destroy_workqueue(dbs_wq);
 }
