@@ -12,4 +12,8 @@ obj-$(CONFIG_W1_SLAVE_DS2760)	+= w1_ds2760.o
 obj-$(CONFIG_W1_SLAVE_DS2780)	+= w1_ds2780.o
 obj-$(CONFIG_W1_SLAVE_DS2781)	+= w1_ds2781.o
 obj-$(CONFIG_W1_SLAVE_BQ27000)	+= w1_bq27000.o
+ifdef CONFIG_MIUI_BUILD
+obj-$(CONFIG_W1_SLAVE_BQ2022)	+= w1_bq2022-xiaomi.o
+else
 obj-$(CONFIG_W1_SLAVE_BQ2022)	+= w1_bq2022.o
+endif
