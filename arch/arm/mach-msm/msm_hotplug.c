@@ -27,7 +27,6 @@
 #include <linux/tick.h>
 
 #define MSM_HOTPLUG		"msm_hotplug"
-#define HOTPLUG_ENABLED		1
 #define DEFAULT_UPDATE_RATE	HZ / 10
 #define START_DELAY		HZ * 20
 #define MIN_INPUT_INTERVAL	150 * 1000L
@@ -49,7 +48,6 @@ do { 				\
 } while (0)
 
 static struct cpu_hotplug {
-	unsigned int enabled;
 	unsigned int target_cpus;
 	unsigned int min_cpus_online;
 	unsigned int max_cpus_online;
@@ -67,7 +65,6 @@ static struct cpu_hotplug {
 	struct work_struct resume_work;
 	struct notifier_block notif;
 } hotplug = {
-	.enabled = HOTPLUG_ENABLED,
 	.min_cpus_online = DEFAULT_MIN_CPUS_ONLINE,
 	.max_cpus_online = DEFAULT_MAX_CPUS_ONLINE,
 	.cpus_boosted = DEFAULT_NR_CPUS_BOOSTED,
@@ -80,7 +77,6 @@ static struct workqueue_struct *hotplug_wq;
 static struct delayed_work hotplug_work;
 
 static u64 last_boost_time;
-
 static unsigned int default_update_rates[] = { DEFAULT_UPDATE_RATE };
 
 static struct cpu_stats {
@@ -369,9 +365,6 @@ static void cpu_down_work(struct work_struct *work)
 
 static void online_cpu(unsigned int target)
 {
-	if (!hotplug.enabled)
-		return;
-
 	if (stats.total_cpus == num_online_cpus())
 		return;
 
@@ -383,9 +376,6 @@ static void offline_cpu(unsigned int target)
 {
 	unsigned int online_cpus = num_online_cpus();
 	u64 now;
-
-	if (!hotplug.enabled)
-		return;
 
 	if (online_cpus == stats.min_cpus)
 		return;
@@ -668,41 +658,6 @@ err:
 }
 
 /************************** sysfs interface ************************/
-
-static ssize_t show_enable_hotplug(struct device *dev,
-				   struct device_attribute *msm_hotplug_attrs,
-				   char *buf)
-{
-	return sprintf(buf, "%u\n", hotplug.enabled);
-}
-
-static ssize_t store_enable_hotplug(struct device *dev,
-				    struct device_attribute *msm_hotplug_attrs,
-				    const char *buf, size_t count)
-{
-	int ret, cpu;
-	unsigned int val;
-
-	ret = sscanf(buf, "%u", &val);
-	if (ret != 1 || val < 0 || val > 1)
-		return -EINVAL;
-
-	hotplug.enabled = val;
-
-	if (hotplug.enabled) {
-		reschedule_hotplug_work();
-	} else {
-		flush_workqueue(hotplug_wq);
-		cancel_delayed_work_sync(&hotplug_work);
-		for_each_online_cpu(cpu) {
-			if (cpu == 0)
-				continue;
-			cpu_down(cpu);
-		}
-	}
-
-	return count;
-}
 
 static ssize_t show_down_lock_duration(struct device *dev,
 				       struct device_attribute
@@ -1062,7 +1017,6 @@ static ssize_t show_current_load(struct device *dev,
 	return sprintf(buf, "%u\n", stats.cur_avg_load);
 }
 
-static DEVICE_ATTR(enabled, 644, show_enable_hotplug, store_enable_hotplug);
 static DEVICE_ATTR(down_lock_duration, 644, show_down_lock_duration,
 		   store_down_lock_duration);
 static DEVICE_ATTR(boost_lock_duration, 644, show_boost_lock_duration,
@@ -1086,7 +1040,6 @@ static DEVICE_ATTR(io_is_busy, 644, show_io_is_busy, store_io_is_busy);
 static DEVICE_ATTR(current_load, 444, show_current_load, NULL);
 
 static struct attribute *msm_hotplug_attrs[] = {
-	&dev_attr_enabled.attr,
 	&dev_attr_down_lock_duration.attr,
 	&dev_attr_boost_lock_duration.attr,
 	&dev_attr_update_rates.attr,
@@ -1171,9 +1124,8 @@ static int __devinit msm_hotplug_probe(struct platform_device *pdev)
 		INIT_DELAYED_WORK(&dl->lock_rem, remove_down_lock);
 	}
 
-	if (hotplug.enabled)
-		queue_delayed_work_on(0, hotplug_wq, &hotplug_work,
-				      START_DELAY);
+	queue_delayed_work_on(0, hotplug_wq, &hotplug_work,
+			      START_DELAY);
 
 	return ret;
 err_dev:
