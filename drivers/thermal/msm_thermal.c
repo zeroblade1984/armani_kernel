@@ -24,8 +24,7 @@
 #include <linux/platform_device.h>
 #include <linux/of.h>
 
-unsigned int temp_threshold = 70;
-module_param(temp_threshold, int, 0755);
+unsigned int temp_threshold = 75;
 
 static struct thermal_info {
 	uint32_t cpuinfo_max_freq;
