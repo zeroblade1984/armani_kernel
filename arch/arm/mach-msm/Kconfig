@@ -3067,4 +3067,10 @@ config XIAOMI_ARMANI_DTB
 	  Only include Xiaomi Armani specific DTBs to limit the number that
 	  get built during kernel compilation.
 
+config MIUI_BUILD
+	default n
+	bool "Build for MIUIv6"
+	help
+	  Option for building kernel for MIUI base ROMs.
+
 endif
