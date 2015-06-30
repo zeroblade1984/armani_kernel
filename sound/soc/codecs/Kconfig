@@ -461,3 +461,10 @@ config SND_SOC_MSM_HDMI_CODEC_RX
 	help
 	HDMI audio drivers should be built only if the platform
         supports hdmi panel.
+
+# Kairi
+config WCD9306_CODEC_CONTROL
+        bool "Taiko/Tapan/Tomtom Codec Control"
+	default y if SND_SOC_WCD9306=y
+	help
+	 Simple Taiko/Tapan/Tomtom codec control interface otherwise known as TAMOD.
