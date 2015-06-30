@@ -272,5 +272,5 @@ module_init(taiko_control_init);
 module_exit(taiko_control_exit);
 
 MODULE_DESCRIPTION("Tapan Audio Codec controller");
-MODULE_AUTHOR("Ceza Rey Templonuevo");
+MODULE_AUTHOR("Cezar Rey Templonuevo");
 MODULE_LICENSE("GPL v2");
