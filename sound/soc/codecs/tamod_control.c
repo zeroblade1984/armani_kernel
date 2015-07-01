@@ -208,52 +208,52 @@ static struct kobj_attribute hp_uhqa_interface =
 	__ATTR(hp_uhqa, 0644, hp_uhqa_show, hp_uhqa_store);
 
 /* sysfs parts */
-static struct attribute *taiko_control_attrs[] = {
+static struct attribute *tapan_control_attrs[] = {
 	NULL,
 };
 
-static struct attribute_group taiko_control_interface_group = {
-	.attrs = taiko_control_attrs,
+static struct attribute_group tapan_control_interface_group = {
+	.attrs = tapan_control_attrs,
 };
 
-static struct attribute *taiko_headset_attrs[] = {
+static struct attribute *tapan_headset_attrs[] = {
 	&hp_digigain_interface.attr,
 	&hp_uhqa_interface.attr,
 	NULL,
 };
 
-static struct attribute_group taiko_headset_interface_group = {
-	.attrs = taiko_headset_attrs,
+static struct attribute_group tapan_headset_interface_group = {
+	.attrs = tapan_headset_attrs,
 	.name  = "headset",
 };
 
-static struct attribute *taiko_speaker_attrs[] = {
+static struct attribute *tapan_speaker_attrs[] = {
 	&spkr_digigain_interface.attr,
 	NULL,
 };
 
-static struct attribute_group taiko_speaker_interface_group = {
-	.attrs = taiko_speaker_attrs,
+static struct attribute_group tapan_speaker_interface_group = {
+	.attrs = tapan_speaker_attrs,
 	.name  = "speaker",
 };
 
-static struct kobject *taiko_control_kobject;
+static struct kobject *tapan_control_kobject;
 
-static int __init taiko_control_init(void)
+static int __init tapan_control_init(void)
 {
 	int ret;
 
-	taiko_control_kobject = kobject_create_and_add("tapan", kernel_kobj);
-	if (!taiko_control_kobject) {
+	tapan_control_kobject = kobject_create_and_add("tapan", kernel_kobj);
+	if (!tapan_control_kobject) {
 		pr_err("Tapan Control: Failed to create kobject interface\n");
 	}
-	ret = sysfs_create_group(taiko_control_kobject, &taiko_control_interface_group);
+	ret = sysfs_create_group(tapan_control_kobject, &tapan_control_interface_group);
 	if (ret) {
-		kobject_put(taiko_control_kobject);
+		kobject_put(tapan_control_kobject);
 	}
 
-	ret = sysfs_create_group(taiko_control_kobject, &taiko_headset_interface_group);
-	ret = sysfs_create_group(taiko_control_kobject, &taiko_speaker_interface_group);
+	ret = sysfs_create_group(tapan_control_kobject, &tapan_headset_interface_group);
+	ret = sysfs_create_group(tapan_control_kobject, &tapan_speaker_interface_group);
 	if (ret) {
 		pr_err("Tapan Control: Failed to create sysfs group(s)\n");
 	}
@@ -261,15 +261,15 @@ static int __init taiko_control_init(void)
 	return ret;
 }
 
-static void __exit taiko_control_exit(void)
+static void __exit tapan_control_exit(void)
 {
-	kobject_put(taiko_control_kobject);
+	kobject_put(tapan_control_kobject);
 
 	return;
 }
 
-module_init(taiko_control_init);
-module_exit(taiko_control_exit);
+module_init(tapan_control_init);
+module_exit(tapan_control_exit);
 
 MODULE_DESCRIPTION("Tapan Audio Codec controller");
 MODULE_AUTHOR("Cezar Rey Templonuevo");
