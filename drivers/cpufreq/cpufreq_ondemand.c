@@ -1015,7 +1015,6 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 
 		if (policy->cur == policy->max)
 			return;
-		freq_target = dbs_freq_increase(policy, this_dbs_info);
 
 		if (freq_target > policy->max)
 			freq_target = policy->max;
