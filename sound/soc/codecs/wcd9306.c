@@ -40,7 +40,7 @@
 #include "wcd9xxx-common.h"
 
 #ifdef CONFIG_WCD9306_CODEC_CONTROL
-#include "wcd9320_control.h"
+#include "tamod_control.h"
 #endif
 
 #define TAPAN_HPH_PA_SETTLE_COMP_ON 3000
