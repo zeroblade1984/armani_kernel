@@ -17,7 +17,6 @@ extern struct snd_soc_codec *wcd9306_codec;
 
 extern bool hp_digigain_con;
 extern bool spkr_digigain_con;
-extern unsigned int uhqa_mode;
 
 extern bool hp_toggle;
 extern bool spkr_toggle;

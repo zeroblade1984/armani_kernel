@@ -20,8 +20,6 @@
 #include "tamod_control.h"
 
 /* Variables Section */
-unsigned int uhqa_mode = 1;
-
 bool hp_digigain_con = false;
 bool spkr_digigain_con = true;
 
@@ -167,46 +165,6 @@ static ssize_t spkr_digigain_store(struct kobject *kobj,
 static struct kobj_attribute spkr_digigain_interface = 
 	__ATTR(spkr_digigain, 0644, spkr_digigain_show, spkr_digigain_store);
 
-static ssize_t hp_uhqa_show(struct kobject *kobj, 
-			    struct kobj_attribute *attr, char *buf)
-{
-	return sprintf(buf, "UHQA Status: %s", uhqa_mode ? "on" : "off");
-}
-
-/* UHQA Mode */
-static ssize_t hp_uhqa_store(struct kobject *kobj,
-			     struct kobj_attribute *attr, 
-			     const char *buf, size_t count)
-{
-	if (sysfs_streq(buf, "on")) {
-		uhqa_mode = 1;
-
-		if (hp_toggle) {
-			tapan_write(wcd9306_codec, TAPAN_A_RX_HPH_L_PA_CTL, 0x48);
-			tapan_write(wcd9306_codec, TAPAN_A_RX_HPH_R_PA_CTL, 0x48);
-			tapan_write(wcd9306_codec, TAPAN_A_RX_HPH_BIAS_PA,  0xAA);
-			snd_soc_update_bits(wcd9306_codec, TAPAN_A_RX_HPH_CHOP_CTL, 0x20, 0x00);
-		}
-
-		return count;
-	}
-
-	if (sysfs_streq(buf, "off")) {
-		uhqa_mode = 0;
-
-		tapan_write(wcd9306_codec, TAPAN_A_RX_HPH_L_PA_CTL, 0x40);
-		tapan_write(wcd9306_codec, TAPAN_A_RX_HPH_R_PA_CTL, 0x40);
-		tapan_write(wcd9306_codec, TAPAN_A_RX_HPH_BIAS_PA,  0x55);
-		snd_soc_update_bits(wcd9306_codec, TAPAN_A_RX_HPH_CHOP_CTL, 0x20, 0x20);
-
-		return count;
-	}
-
-	return -EINVAL;
-}
-static struct kobj_attribute hp_uhqa_interface = 
-	__ATTR(hp_uhqa, 0644, hp_uhqa_show, hp_uhqa_store);
-
 /* sysfs parts */
 static struct attribute *tapan_control_attrs[] = {
 	NULL,
@@ -218,7 +176,6 @@ static struct attribute_group tapan_control_interface_group = {
 
 static struct attribute *tapan_headset_attrs[] = {
 	&hp_digigain_interface.attr,
-	&hp_uhqa_interface.attr,
 	NULL,
 };
 
