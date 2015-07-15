@@ -2721,12 +2721,6 @@ static int tapan_hph_pa_event(struct snd_soc_dapm_widget *w,
 			tapan_write(codec, TAPAN_A_CDC_RX1_VOL_CTL_B2_CTL, hp_digigain);
 			tapan_write(codec, TAPAN_A_CDC_RX2_VOL_CTL_B2_CTL, hp_digigain);
 		}
-		if (uhqa_mode) {
-			tapan_write(wcd9306_codec, TAPAN_A_RX_HPH_L_PA_CTL, 0x48);
-			tapan_write(wcd9306_codec, TAPAN_A_RX_HPH_R_PA_CTL, 0x48);
-			tapan_write(wcd9306_codec, TAPAN_A_RX_HPH_BIAS_PA,  0xAA);
-			snd_soc_update_bits(wcd9306_codec, TAPAN_A_RX_HPH_CHOP_CTL, 0x20, 0x00);
-		}
 #endif
 
 		break;
