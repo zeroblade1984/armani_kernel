@@ -48,7 +48,7 @@
 #define LOOPBACK_INX (NUM_SMD_PKT_PORTS - 1)
 
 #define DEVICE_NAME "smdpkt"
-#define WAKELOCK_TIMEOUT (2*HZ)
+#define WAKELOCK_TIMEOUT (HZ)
 
 struct smd_pkt_dev {
 	struct cdev cdev;

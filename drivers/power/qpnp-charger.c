@@ -1790,7 +1790,7 @@ qpnp_chg_usb_usbin_valid_irq_handler(int irq, void *_chip)
 					msecs_to_jiffies(2000));
 		}
 
-        wake_lock_timeout(&chip->wl, HZ * 1.5);
+        wake_lock_timeout(&chip->wl, HZ);
 		power_supply_set_present(chip->usb_psy, chip->usb_present);
 		schedule_work(&chip->batfet_lcl_work);
 	}
