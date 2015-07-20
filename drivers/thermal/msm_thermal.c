@@ -42,7 +42,7 @@ static struct thermal_info {
 
 enum thermal_freqs {
 	FREQ_VERY_HOT		= 787200,
-	FREQ_HOT		= 998400,
+	FREQ_HOT		= 1094400,
 	FREQ_WARM		= 1305600,
 };
 
@@ -136,7 +136,7 @@ static void check_temp(struct work_struct *work)
 	}
 
 reschedule:
-	schedule_delayed_work_on(0, &check_temp_work, msecs_to_jiffies(250));
+	schedule_delayed_work_on(0, &check_temp_work, msecs_to_jiffies(300));
 }
 
 static int __devinit msm_thermal_dev_probe(struct platform_device *pdev)
