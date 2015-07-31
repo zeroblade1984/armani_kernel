@@ -465,6 +465,9 @@ static ssize_t store_io_is_busy(struct kobject *a, struct attribute *b,
 	unsigned int input;
 	int ret;
 
+	if (sysfs_streq(current->comm, "mpdecision"))
+		return -EINVAL;
+
 	ret = sscanf(buf, "%u", &input);
 	if (ret != 1)
 		return -EINVAL;
