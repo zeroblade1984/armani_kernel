@@ -78,7 +78,7 @@ static struct notifier_block msm_thermal_cpufreq_notifier = {
 	.notifier_call = msm_thermal_cpufreq_callback,
 };
 
-static void limit_cpu_freqs(uint32_t max_freq)
+static void __ref limit_cpu_freqs(uint32_t max_freq)
 {
 	unsigned int cpu;
 
@@ -127,8 +127,7 @@ static void check_temp(struct work_struct *work)
 	else if (temp > temp_threshold)
 		freq = FREQ_WARM;
 
-	if (freq)
-	{
+	if (freq) {
 		limit_cpu_freqs(freq);
 
 		if (!info.throttling)
