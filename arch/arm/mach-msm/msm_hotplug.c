@@ -591,9 +591,6 @@ static void msm_hotplug_resume(struct work_struct *work)
 static int lcd_notifier_callback(struct notifier_block *nb,
                                  unsigned long event, void *data)
 {
-	if (!hotplug.enabled)
-		return NOTIFY_OK;
-
 	switch (event) {
 	case LCD_EVENT_ON_START:
 		schedule_work(&hotplug.resume_work);
