@@ -1517,6 +1517,7 @@ static int wcd9306_put_dec_enum(struct snd_kcontrol *kcontrol,
 	u16 tx_mux_ctl_reg;
 	u8 adc_dmic_sel = 0x0;
 	int ret = 0;
+	char *srch = NULL;
 
 	if (ucontrol->value.enumerated.item[0] > e->max - 1)
 		return -EINVAL;
@@ -1535,8 +1536,12 @@ static int wcd9306_put_dec_enum(struct snd_kcontrol *kcontrol,
 		ret =  -EINVAL;
 		goto out;
 	}
-
-	ret = kstrtouint(strpbrk(dec_name, "1234"), 10, &decimator);
+	srch = strpbrk(dec_name, "1234");
+	if (srch == NULL) {
+		pr_err("%s: Invalid decimator name %s\n", __func__, dec_name);
+		return -EINVAL;
+	}
+	ret = kstrtouint(srch, 10, &decimator);
 	if (ret < 0) {
 		pr_err("%s: Invalid decimator = %s\n", __func__, dec_name);
 		ret =  -EINVAL;
@@ -2041,8 +2046,15 @@ static int tapan_codec_enable_dmic(struct snd_soc_dapm_widget *w,
 	s32 *dmic_clk_cnt;
 	unsigned int dmic;
 	int ret;
+	char *srch = NULL;
 
-	ret = kstrtouint(strpbrk(w->name, "1234"), 10, &dmic);
+	srch = strpbrk(w->name, "1234");
+	if (srch == NULL) {
+		pr_err("%s: Invalid widget name %s\n", __func__, w->name);
+		return -EINVAL;
+	}
+
+	ret = kstrtouint(srch, 10, &dmic);
 	if (ret < 0) {
 		pr_err("%s: Invalid DMIC line on the codec\n", __func__);
 		return -EINVAL;
@@ -2310,16 +2322,23 @@ static int tapan_codec_enable_micbias(struct snd_soc_dapm_widget *w,
 }
 
 /* called under codec_resource_lock acquisition */
-static int tapan_enable_mbhc_micbias(struct snd_soc_codec *codec, bool enable)
+static int tapan_enable_mbhc_micbias(struct snd_soc_codec *codec, bool enable,
+				     enum wcd9xxx_micbias_num micb_num)
 {
 	int rc;
+	const char *micbias;
+
+	if (micb_num == MBHC_MICBIAS2)
+		micbias = DAPM_MICBIAS2_EXTERNAL_STANDALONE;
+	else
+		return -EINVAL;
 
 	if (enable)
 		rc = snd_soc_dapm_force_enable_pin(&codec->dapm,
-					     DAPM_MICBIAS2_EXTERNAL_STANDALONE);
+						   micbias);
 	else
 		rc = snd_soc_dapm_disable_pin(&codec->dapm,
-					     DAPM_MICBIAS2_EXTERNAL_STANDALONE);
+					      micbias);
 	if (!rc)
 		snd_soc_dapm_sync(&codec->dapm);
 	pr_debug("%s: leave ret %d\n", __func__, rc);
@@ -2367,6 +2386,7 @@ static int tapan_codec_enable_dec(struct snd_soc_dapm_widget *w,
 	u16 dec_reset_reg, tx_vol_ctl_reg, tx_mux_ctl_reg;
 	u8 dec_hpf_cut_of_freq;
 	int offset;
+	char *srch = NULL;
 
 	dev_dbg(codec->dev, "%s %d\n", __func__, event);
 
@@ -2382,8 +2402,12 @@ static int tapan_codec_enable_dec(struct snd_soc_dapm_widget *w,
 		ret =  -EINVAL;
 		goto out;
 	}
-
-	ret = kstrtouint(strpbrk(dec_name, "123456789"), 10, &decimator);
+	srch = strpbrk(dec_name, "123456789");
+	if (srch == NULL) {
+		pr_err("%s: Invalid decimator name %s\n", __func__, dec_name);
+		return -EINVAL;
+	}
+	ret = kstrtouint(srch, 10, &decimator);
 	if (ret < 0) {
 		pr_err("%s: Invalid decimator = %s\n", __func__, dec_name);
 		ret =  -EINVAL;
@@ -3343,7 +3367,7 @@ static void tapan_shutdown(struct snd_pcm_substream *substream,
 	dev_dbg(dai->codec->dev, "%s(): substream = %s  stream = %d\n",
 		 __func__, substream->name, substream->stream);
 
-	if (dai->id <= NUM_CODEC_DAIS) {
+	if (dai->id < NUM_CODEC_DAIS) {
 		if (tapan->dai[dai->id].ch_mask) {
 			active = 1;
 			dev_dbg(dai->codec->dev, "%s(): Codec DAI: chmask[%d] = 0x%lx\n",
@@ -3462,7 +3486,7 @@ static int tapan_set_channel_map(struct snd_soc_dai *dai,
 {
 	struct tapan_priv *tapan = snd_soc_codec_get_drvdata(dai->codec);
 	struct wcd9xxx *core = dev_get_drvdata(dai->codec->dev->parent);
-	if (!tx_slot && !rx_slot) {
+	if (!tx_slot || !rx_slot) {
 		pr_err("%s: Invalid\n", __func__);
 		return -EINVAL;
 	}
@@ -4878,9 +4902,9 @@ static int tapan_handle_pdata(struct tapan_priv *tapan)
 	struct snd_soc_codec *codec = tapan->codec;
 	struct wcd9xxx_pdata *pdata = tapan->resmgr.pdata;
 	int k1, k2, k3, rc = 0;
-	u8 txfe_bypass = pdata->amic_settings.txfe_enable;
-	u8 txfe_buff = pdata->amic_settings.txfe_buff;
-	u8 flag = pdata->amic_settings.use_pdata;
+	u8 txfe_bypass;
+	u8 txfe_buff;
+	u8 flag;
 	u8 i = 0, j = 0;
 	u8 val_txfe = 0, value = 0;
 	u8 dmic_sample_rate_value = 0;
@@ -4892,6 +4916,9 @@ static int tapan_handle_pdata(struct tapan_priv *tapan)
 		rc = -ENODEV;
 		goto done;
 	}
+	txfe_bypass = pdata->amic_settings.txfe_enable;
+	txfe_buff = pdata->amic_settings.txfe_buff;
+	flag = pdata->amic_settings.use_pdata;
 
 	/* Make sure settings are correct */
 	if ((pdata->micbias.ldoh_v > WCD9XXX_LDOH_3P0_V) ||

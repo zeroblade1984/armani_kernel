@@ -555,7 +555,6 @@ static const struct intr_data intr_tbl_v2[] = {
 	{WCD9XXX_IRQ_EAR_PA_OCPL_FAULT, false},
 	{WCD9XXX_IRQ_HPH_L_PA_STARTUP, false},
 	{WCD9XXX_IRQ_HPH_R_PA_STARTUP, false},
-	{WCD9320_IRQ_EAR_PA_STARTUP, false},
 	{WCD9XXX_IRQ_RESERVED_0, false},
 	{WCD9XXX_IRQ_RESERVED_1, false},
 	{WCD9XXX_IRQ_MAD_AUDIO, false},
@@ -1720,7 +1719,6 @@ static int wcd9xxx_slim_device_down(struct slim_device *sldev)
 {
 	struct wcd9xxx *wcd9xxx = slim_get_devicedata(sldev);
 
-	dev_info(wcd9xxx->dev, "%s: device down\n", __func__);
 	if (!wcd9xxx) {
 		pr_err("%s: wcd9xxx is NULL\n", __func__);
 		return -EINVAL;
